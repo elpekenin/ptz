@@ -182,11 +182,15 @@ fn Filter(comptime T: type) type {
                 .not_null => try writer.print("notnull:", .{}),
             }
 
+            var percent_writer: percent_encoding.Writer = .init(writer);
+            var percent = percent_writer.writer();
+
             switch (self.value) {
                 .none => {},
-                .str => |str| try writer.print("{s}", .{str}),
-                .int => |int| try writer.print("{d}", .{int}),
-                .float => |float| try writer.print("{d}", .{float}),
+                .str => |str| try percent.print("{s}", .{str}),
+                // numbers likely dont need to be escaped, but just in case
+                .int => |int| try percent.print("{d}", .{int}),
+                .float => |float| try percent.print("{d}", .{float}),
             }
         }
     };

@@ -1,11 +1,11 @@
 const std = @import("std");
-const Writer = std.Io.Writer;
+const StdWriter = std.Io.Writer;
 
-pub const PercentEncodedWriter = struct {
-    _wrapped: *Writer,
-    _writer: Writer,
+pub const Writer = struct {
+    _wrapped: *StdWriter,
+    _writer: StdWriter,
 
-    fn writeEncodedChar(w: *Writer, c: u8) Writer.Error!usize {
+    fn writeEncodedChar(w: *StdWriter, c: u8) StdWriter.Error!usize {
         switch (c) {
             // keep as is
             'a'...'z',
@@ -31,7 +31,7 @@ pub const PercentEncodedWriter = struct {
         }
     }
 
-    fn writeEncodedSlice(w: *Writer, slice: []const u8) Writer.Error!usize {
+    fn writeEncodedSlice(w: *StdWriter, slice: []const u8) StdWriter.Error!usize {
         var n: usize = 0;
 
         for (slice) |c| {
@@ -41,8 +41,8 @@ pub const PercentEncodedWriter = struct {
         return n;
     }
 
-    fn drain(io_w: *Writer, data: []const []const u8, splat: usize) Writer.Error!usize {
-        const self: *PercentEncodedWriter = @fieldParentPtr("_writer", io_w);
+    fn drain(io_w: *StdWriter, data: []const []const u8, splat: usize) StdWriter.Error!usize {
+        const self: *Writer = @fieldParentPtr("_writer", io_w);
 
         var n: usize = 0;
         for (data[0 .. data.len - 1]) |slice| {
@@ -57,7 +57,7 @@ pub const PercentEncodedWriter = struct {
         return n;
     }
 
-    pub fn init(w: *Writer) PercentEncodedWriter {
+    pub fn init(w: *StdWriter) Writer {
         return .{
             ._wrapped = w,
             ._writer = .{
@@ -69,7 +69,7 @@ pub const PercentEncodedWriter = struct {
         };
     }
 
-    pub fn writer(self: *PercentEncodedWriter) *Writer {
+    pub fn writer(self: *Writer) *StdWriter {
         return &self._writer;
     }
 };

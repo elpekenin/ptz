@@ -1,10 +1,13 @@
 const std = @import("std");
 const ptz = @import("ptz");
 
-fn exit(msg: []const u8) u8 {
-    std.debug.print("{s}\n", .{msg});
-    std.debug.print("---\n", .{});
-    std.debug.print(
+fn usage(msg: []const u8) !void {
+    var stderr_writer: std.fs.File.Writer = .init(.stderr(), &.{});
+    const stderr = &stderr_writer.interface;
+
+    try stderr.print("{s}\n", .{msg});
+    try stderr.print("---\n", .{});
+    try stderr.print(
         \\usage: ptz <name>
         \\
         \\Example CLI to search for cards
@@ -14,10 +17,13 @@ fn exit(msg: []const u8) u8 {
         .{},
     );
 
-    return 1;
+    try stderr.flush();
 }
 
 pub fn main() !u8 {
+    var stdout_writer: std.fs.File.Writer = .init(.stdout(), &.{});
+    const stdout = &stdout_writer.interface;
+
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     const allocator = gpa.allocator();
 
@@ -25,11 +31,13 @@ pub fn main() !u8 {
     _ = args.skip(); // exe name
 
     const name = args.next() orelse {
-        return exit("missing argument");
+        try usage("missing argument");
+        return 1;
     };
 
     if (args.next()) |_| {
-        return exit("a single argument is expected");
+        try usage("a single argument is expected");
+        return 1;
     }
 
     var iterator = ptz.Card.Brief.iterator(.{
@@ -44,9 +52,11 @@ pub fn main() !u8 {
                 .id = c.id,
             });
 
-            std.debug.print("{f}\n\n", .{card});
+            try stdout.print("{f}\n\n", .{card});
         }
     }
+
+    try stdout.flush();
 
     return 0;
 }
