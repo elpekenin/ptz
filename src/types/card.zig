@@ -27,13 +27,9 @@ const Common = struct {
 
 // assert that types have all the common fields, and they are the right type
 comptime {
-    var c: Common = undefined;
-
     for (.{ Pokemon, Trainer, Energy }) |T| {
-        var t: T = undefined;
-
         for (@typeInfo(Common).@"struct".fields) |field| {
-            @field(t, field.name) = @field(c, field.name);
+            std.debug.assert(@FieldType(T, field.name) == field.type);
         }
     }
 }
