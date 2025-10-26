@@ -15,7 +15,6 @@ const Common = struct {
     localId: []const u8,
     name: []const u8,
     image: ?[]const u8 = null,
-    // category: enums.Category, // we already made a tagged union
     illustrator: ?[]const u8 = null,
     rarity: ?enums.Rarity = null,
     set: Set.Brief,
@@ -49,7 +48,7 @@ const Pokemon = struct {
 
     //
 
-    dexId: ?[]const u8 = null,
+    dexId: ?[]const u8 = null, // sometimes text, sometimes array of values
     hp: ?usize = null,
     types: ?[]const enums.PokemonType = null,
     evolveFrom: ?[]const u8 = null,
@@ -57,10 +56,12 @@ const Pokemon = struct {
     level: ?[]const u8 = null,
     stage: ?enums.Stage = null,
     suffix: ?[]const u8 = null, // TODO: enum
-    item: ?struct {
+    item: ?Item = null,
+
+    const Item = struct {
         name: []const u8,
         effect: []const u8,
-    } = null, // TODO: what is this
+    };
 
     pub fn format(
         self: Pokemon,
@@ -230,7 +231,7 @@ pub const Card = union(enum) {
     fn commonFormat(comptime T: type, value: T, writer: *std.Io.Writer) std.Io.Writer.Error!void {
         std.debug.assert(T == Pokemon or T == Energy or T == Trainer);
 
-        try writer.print("{{ .id = {s}, .local_id = {s}, .name = {s},", .{
+        try writer.print(".id = {s}, .local_id = {s}, .name = {s},", .{
             value.id,
             value.localId,
             value.name,
@@ -271,18 +272,21 @@ pub const Card = union(enum) {
         self: Card,
         writer: *std.Io.Writer,
     ) std.Io.Writer.Error!void {
-        try writer.print("{t}", .{self});
+        try writer.print("{t}{{", .{self});
 
         switch (self) {
-            .pokemon => |value| try commonFormat(Pokemon, value, writer),
-            .energy => |value| try commonFormat(Energy, value, writer),
-            .trainer => |value| try commonFormat(Trainer, value, writer),
-        }
-
-        switch (self) {
-            .pokemon => try writer.print("{f}", .{self.pokemon}),
-            .trainer => try writer.print("{f}", .{self.trainer}),
-            .energy => try writer.print("{f}", .{self.energy}),
+            .pokemon => |value| {
+                try commonFormat(Pokemon, value, writer);
+                try writer.print("{f}", .{value});
+            },
+            .energy => |value| {
+                try commonFormat(Energy, value, writer);
+                try writer.print("{f}", .{value});
+            },
+            .trainer => |value| {
+                try commonFormat(Trainer, value, writer);
+                try writer.print("{f}", .{value});
+            },
         }
 
         try writer.print(" }}", .{});
