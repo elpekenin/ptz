@@ -1,6 +1,12 @@
 const std = @import("std");
 const ptz = @import("ptz");
 
+const Type = enum {
+    card,
+    serie,
+    set,
+};
+
 fn usage(msg: []const u8) !void {
     var stderr_writer: std.fs.File.Writer = .init(.stderr(), &.{});
     const stderr = &stderr_writer.interface;
@@ -8,16 +14,71 @@ fn usage(msg: []const u8) !void {
     try stderr.print("{s}\n", .{msg});
     try stderr.print("---\n", .{});
     try stderr.print(
-        \\usage: ptz <name>
+        \\usage: ptz <type> <name>
         \\
         \\Example CLI to search for cards
         \\
+        \\  <type>: Type to query (Card, Serie, Set)
         \\  <name>: Name to look for (lax equality)
     ,
         .{},
     );
 
     try stderr.flush();
+}
+
+fn handleCard(allocator: std.mem.Allocator, stdout: *std.Io.Writer, name: []const u8) !void {
+    var iterator = ptz.Card.all(.{
+        .where = &.{
+            .like(.name, name),
+        },
+    });
+
+    while (try iterator.next(allocator)) |briefs| {
+        for (briefs) |brief| {
+            const card: ptz.Card = try .get(allocator, .{
+                .id = brief.id,
+            });
+
+            try stdout.print("{f}\n\n", .{card});
+        }
+    }
+}
+
+fn handleSerie(allocator: std.mem.Allocator, stdout: *std.Io.Writer, name: []const u8) !void {
+    var iterator = ptz.Serie.all(.{
+        .where = &.{
+            .like(.name, name),
+        },
+    });
+
+    while (try iterator.next(allocator)) |briefs| {
+        for (briefs) |brief| {
+            const serie: ptz.Serie = try .get(allocator, .{
+                .id = brief.id,
+            });
+
+            try stdout.print("{f}\n\n", .{serie});
+        }
+    }
+}
+
+fn handleSet(allocator: std.mem.Allocator, stdout: *std.Io.Writer, name: []const u8) !void {
+    var iterator = ptz.Set.all(.{
+        .where = &.{
+            .like(.name, name),
+        },
+    });
+
+    while (try iterator.next(allocator)) |briefs| {
+        for (briefs) |brief| {
+            const set: ptz.Set = try .get(allocator, .{
+                .id = brief.id,
+            });
+
+            try stdout.print("{f}\n\n", .{set});
+        }
+    }
 }
 
 pub fn main() !u8 {
@@ -30,6 +91,20 @@ pub fn main() !u8 {
     var args = std.process.args();
     _ = args.skip(); // exe name
 
+    const typ: Type = blk: {
+        const str = args.next() orelse {
+            try usage("missing argument");
+            return 1;
+        };
+
+        const typ = std.meta.stringToEnum(Type, str) orelse {
+            try usage("unknown type");
+            return 1;
+        };
+
+        break :blk typ;
+    };
+
     const name = args.next() orelse {
         try usage("missing argument");
         return 1;
@@ -40,20 +115,10 @@ pub fn main() !u8 {
         return 1;
     }
 
-    var iterator = ptz.Card.Brief.iterator(.{
-        .where = &.{
-            .like(.name, name),
-        },
-    });
-
-    while (try iterator.next(allocator)) |cards| {
-        for (cards) |c| {
-            const card: ptz.Card = try .get(allocator, .{
-                .id = c.id,
-            });
-
-            try stdout.print("{f}\n\n", .{card});
-        }
+    switch (typ) {
+        .card => try handleCard(allocator, stdout, name),
+        .serie => try handleSerie(allocator, stdout, name),
+        .set => try handleSet(allocator, stdout, name),
     }
 
     try stdout.flush();

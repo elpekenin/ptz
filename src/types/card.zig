@@ -312,6 +312,19 @@ pub const Card = union(enum) {
         pub fn iterator(params: query.Params(Brief)) query.Iterator(Brief) {
             return .new(params);
         }
+
+        pub fn format(
+            self: Brief,
+            writer: *std.Io.Writer,
+        ) std.Io.Writer.Error!void {
+            try writer.print("{{ .id = {s}, .localId = {s}, .name = {s},", .{ self.id, self.localId, self.name });
+
+            if (self.image) |image| {
+                try writer.print(" .image = {s},", .{image});
+            }
+
+            try writer.print(" }}", .{});
+        }
     };
 
     pub fn jsonParseFromValue(
