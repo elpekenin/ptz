@@ -1,14 +1,17 @@
 const std = @import("std");
 
+const fmt = @import("../fmt.zig");
 const enums = @import("enums.zig");
 const query = @import("../query.zig");
-const Attack = @import("Attack.zig");
 const Booster = @import("Booster.zig");
-const Effectiveness = @import("Effectiveness.zig");
 const Legality = @import("Legality.zig");
 const Set = @import("Set.zig");
 const Pricing = @import("Pricing.zig");
-const Variants = @import("Variants.zig");
+
+// TODO:
+// legal: Legality,
+// regulationMark: ?[]const u8 = null, // TODO: enum
+// variants_detailed: []Variants.Detailed,
 
 const Common = struct {
     id: []const u8,
@@ -33,6 +36,84 @@ comptime {
     }
 }
 
+const Ability = struct {
+    type: enums.AbilityType,
+    name: ?[]const u8 = null, // FIXME
+    effect: ?[]const u8 = null, // FIXME
+
+    pub fn format(
+        self: Ability,
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+        try writer.print("{{ .type = {t},", .{self.type});
+
+        if (self.name) |name| {
+            try writer.print(" .name = {s},", .{name});
+        }
+
+        if (self.effect) |effect| {
+            try writer.print(" .effect = {s},", .{effect});
+        }
+
+        try writer.print(" }}", .{});
+    }
+};
+
+const Attack = struct {
+    cost: []const enums.Type,
+    name: []const u8,
+    effect: ?[]const u8 = null,
+    // TODO: sometimes text, sometimes number, can't parse it using stdlib
+    // damage: ?[]const u8 = null,
+
+    pub fn format(
+        self: Attack,
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+        try writer.print("{{ .cost = ", .{});
+
+        try fmt.printSlice(enums.Type, writer, "{t}", self.cost);
+
+        try writer.print(", .name = {s},", .{self.name});
+
+        if (self.effect) |effect| {
+            try writer.print(" .effect = {s},", .{effect});
+        }
+
+        try writer.print(" }}", .{});
+    }
+};
+
+const Effectiveness = struct {
+    type: enums.Type,
+    value: []const u8, // TODO: enum?
+
+    pub fn format(
+        self: Effectiveness,
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+        try writer.print("{{ .type = {t}, .value = {s} }}", .{ self.type, self.value });
+    }
+};
+
+const Variants = struct {
+    normal: bool,
+    reverse: bool,
+    holo: bool,
+    firstEdition: bool,
+
+    pub fn format(
+        self: Variants,
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+        try writer.print("{{ .normal = {}, .reverse = {}, .holo ={}, .firstEdition = {} }}", .{ self.normal, self.reverse, self.holo, self.firstEdition });
+    }
+};
+
+//
+// actual card types
+//
+
 const Pokemon = struct {
     id: []const u8,
     localId: []const u8,
@@ -50,17 +131,29 @@ const Pokemon = struct {
 
     dexId: ?[]const u8 = null, // sometimes text, sometimes array of values
     hp: ?usize = null,
-    types: ?[]const enums.PokemonType = null,
+    types: ?[]const enums.Type = null,
     evolveFrom: ?[]const u8 = null,
     description: ?[]const u8 = null,
     level: ?[]const u8 = null,
     stage: ?enums.Stage = null,
-    suffix: ?[]const u8 = null, // TODO: enum
+    suffix: ?enums.Suffix = null,
     item: ?Item = null,
+    abilities: ?[]const Ability = null,
+    attacks: []const Attack,
+    weaknesses: ?[]const Effectiveness = null,
+    resistances: ?[]const Effectiveness = null,
+    retreat: ?u8 = null,
 
     const Item = struct {
         name: []const u8,
         effect: []const u8,
+
+        pub fn format(
+            self: Item,
+            writer: *std.Io.Writer,
+        ) std.Io.Writer.Error!void {
+            try writer.print("{{ .name = {s}, .effect = {s} }}", .{ self.name, self.effect });
+        }
     };
 
     pub fn format(
@@ -76,13 +169,9 @@ const Pokemon = struct {
         }
 
         if (self.types) |types| {
-            try writer.print(" .types = {{", .{});
-
-            for (types) |typ| {
-                try writer.print(" {t},", .{typ});
-            }
-
-            try writer.writeByte('}');
+            try writer.print(" .types = ", .{});
+            try fmt.printSlice(enums.Type, writer, "{t}", types);
+            try writer.writeByte(',');
         }
 
         if (self.evolveFrom) |evolveFrom| {
@@ -102,11 +191,39 @@ const Pokemon = struct {
         }
 
         if (self.suffix) |suffix| {
-            try writer.print(" .suffix = {s},", .{suffix});
+            try writer.print(" .suffix = {t},", .{suffix});
         }
 
         if (self.item) |item| {
-            try writer.print(" .item = {any},", .{item});
+            try writer.print(" .item = {f},", .{item});
+        }
+
+        if (self.abilities) |abilities| {
+            try writer.print(" .abilities = ", .{});
+            try fmt.printSlice(Ability, writer, "{f}", abilities);
+            try writer.writeByte(',');
+        }
+
+        {
+            try writer.print(" .attacks = ", .{});
+            try fmt.printSlice(Attack, writer, "{f}", self.attacks);
+            try writer.writeByte(',');
+        }
+
+        if (self.weaknesses) |weaknesses| {
+            try writer.print(" .weaknesses = ", .{});
+            try fmt.printSlice(Effectiveness, writer, "{f}", weaknesses);
+            try writer.writeByte(',');
+        }
+
+        if (self.resistances) |resistances| {
+            try writer.print(" .resistances = ", .{});
+            try fmt.printSlice(Effectiveness, writer, "{f}", resistances);
+            try writer.writeByte(',');
+        }
+
+        if (self.retreat) |retreat| {
+            try writer.print(" .retreat = {d},", .{retreat});
         }
     }
 };
@@ -153,7 +270,7 @@ const Energy = struct {
     //
 
     effect: []const u8,
-    energyType: enums.EnergyKind,
+    energyType: enums.EnergyType,
 
     pub fn format(
         self: Energy,
@@ -190,7 +307,7 @@ pub const Card = union(enum) {
         id: []const u8,
         localId: []const u8,
         name: []const u8,
-        image: ?[]const u8 = null, // shouldn't be missing, but sometimes is
+        image: ?[]const u8 = null,
 
         pub fn iterator(params: query.Params(Brief)) query.Iterator(Brief) {
             return .new(params);
@@ -249,20 +366,16 @@ pub const Card = union(enum) {
             try writer.print(" .rarity = {t},", .{rarity});
         }
 
-        try writer.print(" .set = {f}, .variants = {any},", .{ value.set, value.variants });
+        try writer.print(" .set = {f}, .variants = {f},", .{ value.set, value.variants });
 
         if (value.boosters) |boosters| {
-            try writer.print(" .boosters = {{", .{});
-
-            for (boosters) |booster| {
-                try writer.print(" {},", .{booster});
-            }
-
-            _ = try writer.write("},");
+            try writer.print(" .boosters = ", .{});
+            try fmt.printSlice(Booster, writer, "{f}", boosters);
+            try writer.writeByte(',');
         }
 
         if (value.pricing) |pricing| {
-            try writer.print(" .pricing = {any},", .{pricing});
+            try writer.print(" .pricing = {f},", .{pricing});
         }
 
         try writer.print(" .updated = {s},", .{value.updated});
@@ -292,12 +405,3 @@ pub const Card = union(enum) {
         try writer.print(" }}", .{});
     }
 };
-
-// TODO: shown on example but not docummented
-// abilities: []const []const u8,
-// attacks: []const Attack,
-// weaknesses: []const Effectiveness,
-// retreat: u8,
-// legal: Legality,
-// regulationMark: ?[]const u8 = null, // TODO: enum
-// variants_detailed: []Variants.Detailed,
