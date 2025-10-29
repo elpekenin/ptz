@@ -2,6 +2,7 @@ const std = @import("std");
 
 const fmt = @import("../fmt.zig");
 const query = @import("../query.zig");
+const Language = @import("enums.zig").Language;
 const Image = @import("Image.zig");
 const Set = @import("Set.zig");
 
@@ -14,13 +15,13 @@ id: []const u8,
 name: []const u8,
 logo: ?Image = null,
 
-pub fn get(allocator: std.mem.Allocator, params: query.Get) !Serie {
+pub fn get(allocator: std.mem.Allocator, language: Language, params: query.Get) !Serie {
     const q: query.Q(Serie, .one) = .{ .params = params };
-    return q.run(allocator);
+    return q.run(allocator, language);
 }
 
-pub fn all(params: query.Params(Brief)) query.Iterator(Brief) {
-    return Brief.iterator(params);
+pub fn all(language: Language, params: query.Params(Brief)) query.Iterator(Brief) {
+    return Brief.iterator(language, params);
 }
 
 pub fn format(
@@ -49,8 +50,8 @@ pub const Brief = struct {
     name: []const u8,
     logo: ?Image = null,
 
-    pub fn iterator(params: query.Params(Brief)) query.Iterator(Brief) {
-        return .new(params);
+    pub fn iterator(language: Language, params: query.Params(Brief)) query.Iterator(Brief) {
+        return .new(language, params);
     }
 
     pub fn format(

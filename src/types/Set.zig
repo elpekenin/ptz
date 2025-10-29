@@ -2,6 +2,7 @@ const std = @import("std");
 
 const fmt = @import("../fmt.zig");
 const query = @import("../query.zig");
+const Language = @import("enums.zig").Language;
 const Booster = @import("Booster.zig");
 const Card = @import("card.zig").Card;
 const Legality = @import("Legality.zig");
@@ -35,13 +36,13 @@ legal: Legality,
 cards: []const Card.Brief,
 boosters: ?[]const Booster = null,
 
-pub fn get(allocator: std.mem.Allocator, params: query.Get) !Set {
+pub fn get(allocator: std.mem.Allocator, language: Language, params: query.Get) !Set {
     const q: query.Q(Set, .one) = .{ .params = params };
-    return q.run(allocator);
+    return q.run(allocator, language);
 }
 
-pub fn all(params: query.Params(Brief)) query.Iterator(Brief) {
-    return Brief.iterator(params);
+pub fn all(language: Language, params: query.Params(Brief)) query.Iterator(Brief) {
+    return Brief.iterator(language, params);
 }
 
 pub fn format(
@@ -88,8 +89,8 @@ pub const Brief = struct {
     symbol: ?[]const u8 = null,
     cardCount: CardCount,
 
-    pub fn iterator(params: query.Params(Brief)) query.Iterator(Brief) {
-        return .new(params);
+    pub fn iterator(language: Language, params: query.Params(Brief)) query.Iterator(Brief) {
+        return .new(language, params);
     }
 
     pub fn format(

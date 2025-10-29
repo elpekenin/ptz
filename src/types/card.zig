@@ -388,13 +388,13 @@ pub const Card = union(enum) {
         category: enums.Category,
     };
 
-    pub fn get(allocator: std.mem.Allocator, params: query.Get) !Card {
+    pub fn get(allocator: std.mem.Allocator, language: enums.Language, params: query.Get) !Card {
         const q: query.Q(Card, .one) = .{ .params = params };
-        return q.run(allocator);
+        return q.run(allocator, language);
     }
 
-    pub fn all(params: query.Params(Brief)) query.Iterator(Brief) {
-        return Brief.iterator(params);
+    pub fn all(language: enums.Language, params: query.Params(Brief)) query.Iterator(Brief) {
+        return Brief.iterator(language, params);
     }
 
     pub const Brief = struct {
@@ -405,8 +405,8 @@ pub const Card = union(enum) {
         name: []const u8,
         image: ?Image = null,
 
-        pub fn iterator(params: query.Params(Brief)) query.Iterator(Brief) {
-            return .new(params);
+        pub fn iterator(language: enums.Language, params: query.Params(Brief)) query.Iterator(Brief) {
+            return .new(language, params);
         }
 
         pub fn format(

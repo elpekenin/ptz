@@ -1,5 +1,7 @@
 // Reference: https://github.com/tcgdex/cards-database/blob/master/interfaces.d.ts
 
+// TODO: Language-specific texts
+
 pub const AbilityType = enum {
     @"Pokemon Power",
     @"Poke-BODY",

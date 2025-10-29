@@ -1,16 +1,11 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Writer = std.Io.Writer;
-const assert = std.debug.assert;
 
 const percent_encoding = @import("percent_encoding.zig");
+const Language = @import("types/enums.zig").Language;
 
-// TODO: configurable language
-const base_url = "https://api.tcgdex.net/v2/en/";
-
-comptime {
-    assert(base_url[base_url.len - 1] == '/');
-}
+const base_url = "https://api.tcgdex.net/v2";
 
 pub const Get = struct {
     id: []const u8,
@@ -295,10 +290,12 @@ pub fn Iterator(comptime T: type) type {
     return struct {
         const Self = @This();
 
+        language: Language,
         params: Params(T),
 
-        pub fn new(params: Params(T)) Self {
+        pub fn new(language: Language, params: Params(T)) Self {
             return .{
+                .language = language,
                 .params = .{
                     .where = params.where,
                     .page = params.page orelse 1,
@@ -318,8 +315,11 @@ pub fn Iterator(comptime T: type) type {
 
             const q: Q(T, .many) = .{ .params = self.params };
 
-            const cards = try q.run(allocator);
-            if (cards.len == 0) return null;
+            const cards: []const T = try q.run(allocator, self.language);
+            if (cards.len == 0) {
+                return null;
+            }
+
             return cards;
         }
     };
@@ -342,21 +342,23 @@ pub fn Q(
             .many => Params(T),
         },
 
-        fn requestUrl(self: *const Self, allocator: Allocator) ![]const u8 {
+        fn requestUrl(self: *const Self, allocator: Allocator, language: Language) ![]const u8 {
             var writer: std.Io.Writer.Allocating = .init(allocator);
             defer writer.deinit();
 
             const w = &writer.writer;
 
-            try w.print("{s}{s}", .{ base_url, T.url });
+            try w.print("{s}/{t}/{s}", .{ base_url, language, T.url });
             try self.params.url(w);
 
             return writer.toOwnedSlice();
         }
 
-        fn sendRequest(self: *const Self, allocator: Allocator) ![]const u8 {
-            const url = try self.requestUrl(allocator);
+        fn sendRequest(self: *const Self, allocator: Allocator, language: Language) ![]const u8 {
+            const url = try self.requestUrl(allocator, language);
             defer allocator.free(url);
+
+            errdefer std.debug.print("url: {s}\n", .{url});
 
             var http_client: std.http.Client = .{
                 .allocator = allocator,
@@ -386,8 +388,8 @@ pub fn Q(
             return writer.toOwnedSlice();
         }
 
-        pub fn run(self: Self, allocator: Allocator) !Value {
-            const body = try self.sendRequest(allocator);
+        pub fn run(self: Self, allocator: Allocator, language: Language) !Value {
+            const body = try self.sendRequest(allocator, language);
             defer allocator.free(body);
 
             errdefer std.debug.print("body: {s}\n", .{body});

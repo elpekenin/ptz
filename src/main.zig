@@ -1,6 +1,8 @@
 const std = @import("std");
 const ptz = @import("ptz");
 
+const language: ptz.Language = .en;
+
 const Type = enum {
     card,
     serie,
@@ -28,17 +30,24 @@ fn usage(msg: []const u8) !void {
 }
 
 fn handleCard(allocator: std.mem.Allocator, stdout: *std.Io.Writer, name: []const u8) !void {
-    var iterator = ptz.Card.all(.{
-        .where = &.{
-            .like(.name, name),
+    var iterator = ptz.Card.all(
+        language,
+        .{
+            .where = &.{
+                .like(.name, name),
+            },
         },
-    });
+    );
 
     while (try iterator.next(allocator)) |briefs| {
         for (briefs) |brief| {
-            const card: ptz.Card = try .get(allocator, .{
-                .id = brief.id,
-            });
+            const card: ptz.Card = try .get(
+                allocator,
+                language,
+                .{
+                    .id = brief.id,
+                },
+            );
 
             try stdout.print("{f}\n\n", .{card});
         }
@@ -46,17 +55,24 @@ fn handleCard(allocator: std.mem.Allocator, stdout: *std.Io.Writer, name: []cons
 }
 
 fn handleSerie(allocator: std.mem.Allocator, stdout: *std.Io.Writer, name: []const u8) !void {
-    var iterator = ptz.Serie.all(.{
-        .where = &.{
-            .like(.name, name),
+    var iterator = ptz.Serie.all(
+        language,
+        .{
+            .where = &.{
+                .like(.name, name),
+            },
         },
-    });
+    );
 
     while (try iterator.next(allocator)) |briefs| {
         for (briefs) |brief| {
-            const serie: ptz.Serie = try .get(allocator, .{
-                .id = brief.id,
-            });
+            const serie: ptz.Serie = try .get(
+                allocator,
+                language,
+                .{
+                    .id = brief.id,
+                },
+            );
 
             try stdout.print("{f}\n\n", .{serie});
         }
@@ -64,17 +80,24 @@ fn handleSerie(allocator: std.mem.Allocator, stdout: *std.Io.Writer, name: []con
 }
 
 fn handleSet(allocator: std.mem.Allocator, stdout: *std.Io.Writer, name: []const u8) !void {
-    var iterator = ptz.Set.all(.{
-        .where = &.{
-            .like(.name, name),
+    var iterator = ptz.Set.all(
+        language,
+        .{
+            .where = &.{
+                .like(.name, name),
+            },
         },
-    });
+    );
 
     while (try iterator.next(allocator)) |briefs| {
         for (briefs) |brief| {
-            const set: ptz.Set = try .get(allocator, .{
-                .id = brief.id,
-            });
+            const set: ptz.Set = try .get(
+                allocator,
+                language,
+                .{
+                    .id = brief.id,
+                },
+            );
 
             try stdout.print("{f}\n\n", .{set});
         }
