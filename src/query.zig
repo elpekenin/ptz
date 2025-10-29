@@ -165,10 +165,12 @@ fn Filter(comptime T: type) type {
         }
 
         pub fn format(self: Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+            var percent_writer: percent_encoding.Writer = .init(writer);
+            var percent = percent_writer.writer();
+
             // field=
             try writer.print("{t}=", .{self.field});
 
-            // TODO: %-escape values?
             switch (self.op) {
                 .like => try writer.print("like:", .{}),
                 .not => try writer.print("not:", .{}),
@@ -181,9 +183,6 @@ fn Filter(comptime T: type) type {
                 .null => try writer.print("null:", .{}),
                 .not_null => try writer.print("notnull:", .{}),
             }
-
-            var percent_writer: percent_encoding.Writer = .init(writer);
-            var percent = percent_writer.writer();
 
             switch (self.value) {
                 .none => {},
@@ -406,8 +405,8 @@ pub fn Q(
             const value: std.json.Value = try .jsonParse(allocator, &scanner, options);
 
             const parsed = try std.json.parseFromValue(Value, allocator, value, options);
-
             // TODO: deinit somehow
+
             return parsed.value;
         }
     };

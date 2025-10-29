@@ -5,6 +5,7 @@ const query = @import("../query.zig");
 const Booster = @import("Booster.zig");
 const Card = @import("card.zig").Card;
 const Legality = @import("Legality.zig");
+const Image = @import("Image.zig");
 const Serie = @import("Serie.zig");
 const Set = @This();
 
@@ -24,7 +25,7 @@ const CardCount = struct {
 
 id: []const u8,
 name: []const u8,
-logo: ?[]const u8 = null,
+logo: ?Image = null,
 symbol: ?[]const u8 = null,
 cardCount: CardCount,
 serie: Serie.Brief,
@@ -50,7 +51,7 @@ pub fn format(
     try writer.print("{{ .id = {s}, .name = {s},", .{ self.id, self.name });
 
     if (self.logo) |logo| {
-        try writer.print(" .logo = {s},", .{logo});
+        try writer.print(" .logo = {f},", .{logo});
     }
 
     if (self.symbol) |symbol| {
@@ -83,7 +84,7 @@ pub const Brief = struct {
 
     id: []const u8,
     name: []const u8,
-    logo: ?[]const u8 = null,
+    logo: ?Image = null,
     symbol: ?[]const u8 = null,
     cardCount: CardCount,
 
@@ -98,7 +99,7 @@ pub const Brief = struct {
         try writer.print("{{ .id = {s}, .name = {s},", .{ self.id, self.name });
 
         if (self.logo) |logo| {
-            try writer.print(" .logo = {s},", .{logo});
+            try writer.print(" .logo = {f},", .{logo});
         }
 
         if (self.symbol) |symbol| {

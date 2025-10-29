@@ -4,6 +4,7 @@ const fmt = @import("../fmt.zig");
 const enums = @import("enums.zig");
 const query = @import("../query.zig");
 const Booster = @import("Booster.zig");
+const Image = @import("Image.zig");
 const Legality = @import("Legality.zig");
 const Set = @import("Set.zig");
 const Pricing = @import("Pricing.zig");
@@ -17,7 +18,7 @@ const Common = struct {
     id: []const u8,
     localId: []const u8,
     name: []const u8,
-    image: ?[]const u8 = null,
+    image: ?Image = null,
     illustrator: ?[]const u8 = null,
     rarity: ?enums.Rarity = null,
     set: Set.Brief,
@@ -38,8 +39,9 @@ comptime {
 
 const Ability = struct {
     type: enums.AbilityType,
-    name: ?[]const u8 = null, // FIXME
-    effect: ?[]const u8 = null, // FIXME
+    // FIXME: these 2 should be required
+    name: ?[]const u8 = null,
+    effect: ?[]const u8 = null,
 
     pub fn format(
         self: Ability,
@@ -63,8 +65,7 @@ const Attack = struct {
     cost: []const enums.Type,
     name: []const u8,
     effect: ?[]const u8 = null,
-    // TODO: sometimes text, sometimes number, can't parse it using stdlib
-    // damage: ?[]const u8 = null,
+    damage: ?Damage = null,
 
     pub fn format(
         self: Attack,
@@ -84,15 +85,103 @@ const Attack = struct {
     }
 };
 
+const Damage = union(enum) {
+    str: []const u8,
+    int: usize,
+
+    pub fn format(
+        self: Damage,
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+        switch (self) {
+            .str => |str| try writer.print("{s}", .{str}),
+            .int => |int| try writer.print("{d}", .{int}),
+        }
+    }
+
+    pub fn jsonParseFromValue(
+        allocator: std.mem.Allocator,
+        source: std.json.Value,
+        options: std.json.ParseOptions,
+    ) std.json.ParseFromValueError!Damage {
+        _ = allocator;
+        _ = options;
+
+        switch (source) {
+            .integer => |int| {
+                return .{ .int = @intCast(int) };
+            },
+            .string => |str| {
+                return .{ .str = str };
+            },
+            else => return error.UnexpectedToken,
+        }
+    }
+};
+
+// TODO: remove/simplify when values get unified upstream
+const DexId = union(enum) {
+    str: []const u8,
+    int: usize,
+
+    pub fn format(
+        self: DexId,
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+        switch (self) {
+            .str => |str| try writer.print("{s}", .{str}),
+            .int => |int| try writer.print("{d}", .{int}),
+        }
+    }
+
+    pub fn jsonParseFromValue(
+        allocator: std.mem.Allocator,
+        source: std.json.Value,
+        options: std.json.ParseOptions,
+    ) std.json.ParseFromValueError!DexId {
+        _ = allocator;
+        _ = options;
+
+        switch (source) {
+            .string => |str| {
+                return .{ .str = str };
+            },
+            .array => |arr| {
+                if (arr.items.len != 1) {
+                    return error.LengthMismatch;
+                }
+
+                const int = switch (arr.items[0]) {
+                    .integer => |int| int,
+                    else => return error.UnexpectedToken,
+                };
+
+                return .{ .int = @intCast(int) };
+            },
+            else => return error.UnexpectedToken,
+        }
+    }
+};
+
 const Effectiveness = struct {
+    const Value = enum {
+        @"×2",
+        @"+10",
+        @"+20",
+        @"+30",
+        @"+40",
+        @"10+",
+        @"20+",
+    };
+
     type: enums.Type,
-    value: []const u8, // TODO: enum?
+    value: Value,
 
     pub fn format(
         self: Effectiveness,
         writer: *std.Io.Writer,
     ) std.Io.Writer.Error!void {
-        try writer.print("{{ .type = {t}, .value = {s} }}", .{ self.type, self.value });
+        try writer.print("{{ .type = {t}, .value = {t} }}", .{ self.type, self.value });
     }
 };
 
@@ -118,7 +207,7 @@ const Pokemon = struct {
     id: []const u8,
     localId: []const u8,
     name: []const u8,
-    image: ?[]const u8 = null,
+    image: ?Image = null,
     illustrator: ?[]const u8 = null,
     rarity: ?enums.Rarity = null,
     set: Set.Brief,
@@ -129,7 +218,7 @@ const Pokemon = struct {
 
     //
 
-    dexId: ?[]const u8 = null, // sometimes text, sometimes array of values
+    dexId: ?DexId = null,
     hp: ?usize = null,
     types: ?[]const enums.Type = null,
     evolveFrom: ?[]const u8 = null,
@@ -139,7 +228,7 @@ const Pokemon = struct {
     suffix: ?enums.Suffix = null,
     item: ?Item = null,
     abilities: ?[]const Ability = null,
-    attacks: []const Attack,
+    attacks: ?[]const Attack = null,
     weaknesses: ?[]const Effectiveness = null,
     resistances: ?[]const Effectiveness = null,
     retreat: ?u8 = null,
@@ -161,7 +250,7 @@ const Pokemon = struct {
         writer: *std.Io.Writer,
     ) std.Io.Writer.Error!void {
         if (self.dexId) |dexId| {
-            try writer.print(" .dexId = {s},", .{dexId});
+            try writer.print(" .dexId = {f},", .{dexId});
         }
 
         if (self.hp) |hp| {
@@ -204,9 +293,9 @@ const Pokemon = struct {
             try writer.writeByte(',');
         }
 
-        {
+        if (self.attacks) |attacks| {
             try writer.print(" .attacks = ", .{});
-            try fmt.printSlice(Attack, writer, "{f}", self.attacks);
+            try fmt.printSlice(Attack, writer, "{f}", attacks);
             try writer.writeByte(',');
         }
 
@@ -232,7 +321,7 @@ const Trainer = struct {
     id: []const u8,
     localId: []const u8,
     name: []const u8,
-    image: ?[]const u8 = null,
+    image: ?Image = null,
     illustrator: ?[]const u8 = null,
     rarity: ?enums.Rarity = null,
     set: Set.Brief,
@@ -243,14 +332,21 @@ const Trainer = struct {
 
     //
 
-    effect: ?[]const u8 = null, // FIXME: not nullable according to docs
-    trainerType: enums.TrainerType,
+    // FIXME: these should be required (?)
+    effect: ?[]const u8 = null,
+    trainerType: ?enums.TrainerType = null,
 
     pub fn format(
         self: Trainer,
         writer: *std.Io.Writer,
     ) std.Io.Writer.Error!void {
-        try writer.print(" .effect = {?s}, .type = {t},", .{ self.effect, self.trainerType });
+        if (self.effect) |effect| {
+            try writer.print(" .effect = {s},", .{ effect });
+        }
+
+        if (self.trainerType) |trainerType| {
+            try writer.print(" .trainerType = {t},", .{ trainerType });
+        }
     }
 };
 
@@ -258,7 +354,7 @@ const Energy = struct {
     id: []const u8,
     localId: []const u8,
     name: []const u8,
-    image: ?[]const u8 = null,
+    image: ?Image = null,
     illustrator: ?[]const u8 = null,
     rarity: ?enums.Rarity = null,
     set: Set.Brief,
@@ -307,7 +403,7 @@ pub const Card = union(enum) {
         id: []const u8,
         localId: []const u8,
         name: []const u8,
-        image: ?[]const u8 = null,
+        image: ?Image = null,
 
         pub fn iterator(params: query.Params(Brief)) query.Iterator(Brief) {
             return .new(params);
@@ -320,7 +416,7 @@ pub const Card = union(enum) {
             try writer.print("{{ .id = {s}, .localId = {s}, .name = {s},", .{ self.id, self.localId, self.name });
 
             if (self.image) |image| {
-                try writer.print(" .image = {s},", .{image});
+                try writer.print(" .image = {f},", .{image});
             }
 
             try writer.print(" }}", .{});
@@ -332,7 +428,6 @@ pub const Card = union(enum) {
         source: std.json.Value,
         options: std.json.ParseOptions,
     ) std.json.ParseFromValueError!Card {
-        // TODO: try and speed up parsing
         const common = try std.json.parseFromValue(Raw, allocator, source, options);
         defer common.deinit();
 
@@ -368,7 +463,7 @@ pub const Card = union(enum) {
         });
 
         if (value.image) |image| {
-            try writer.print(" .image = {s},", .{image});
+            try writer.print(" .image = {f},", .{image});
         }
 
         if (value.illustrator) |illustrator| {

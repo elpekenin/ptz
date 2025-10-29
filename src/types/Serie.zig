@@ -2,6 +2,7 @@ const std = @import("std");
 
 const fmt = @import("../fmt.zig");
 const query = @import("../query.zig");
+const Image = @import("Image.zig");
 const Set = @import("Set.zig");
 
 const Serie = @This();
@@ -11,7 +12,7 @@ pub const url = "series";
 sets: []const Set.Brief,
 id: []const u8,
 name: []const u8,
-logo: ?[]const u8 = null,
+logo: ?Image = null,
 
 pub fn get(allocator: std.mem.Allocator, params: query.Get) !Serie {
     const q: query.Q(Serie, .one) = .{ .params = params };
@@ -35,7 +36,7 @@ pub fn format(
     try writer.print(" .id = {s}, .name = {s},", .{self.id, self.name});
 
     if (self.logo) |logo| {
-        try writer.print(" .logo = {s},", .{logo});
+        try writer.print(" .logo = {f},", .{logo});
     }
 
     try writer.print(" }}", .{});
@@ -46,7 +47,7 @@ pub const Brief = struct {
 
     id: []const u8,
     name: []const u8,
-    logo: ?[]const u8 = null,
+    logo: ?Image = null,
 
     pub fn iterator(params: query.Params(Brief)) query.Iterator(Brief) {
         return .new(params);
@@ -59,7 +60,7 @@ pub const Brief = struct {
         try writer.print("{{ .id = {s}, .name = {s},", .{self.id, self.name});
 
         if (self.logo) |logo| {
-            try writer.print(" .logo = {s},", .{logo});
+            try writer.print(" .logo = {f},", .{logo});
         }
 
         try writer.print(" }}", .{});
