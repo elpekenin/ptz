@@ -1,5 +1,9 @@
-pub const Language = @import("types/enums.zig").Language;
+const Language = @import("language.zig").Language;
 
-pub const Card = @import("types/card.zig").Card;
-pub const Serie = @import("types/Serie.zig");
-pub const Set = @import("types/Set.zig");
+pub fn Sdk(comptime language: Language) type {
+    return struct {
+        pub const Card = @import("types/card.zig").Card(language);
+        pub const Serie = @import("types/serie.zig").Serie(language);
+        pub const Set = @import("types/set.zig").Set(language);
+    };
+}

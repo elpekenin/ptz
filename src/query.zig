@@ -3,413 +3,417 @@ const Allocator = std.mem.Allocator;
 const Writer = std.Io.Writer;
 
 const percent_encoding = @import("percent_encoding.zig");
-const Language = @import("types/enums.zig").Language;
+const Language = @import("language.zig").Language;
 
 const base_url = "https://api.tcgdex.net/v2";
 
-pub const Get = struct {
-    id: []const u8,
-
-    fn url(self: *const Get, writer: *Writer) !void {
-        try writer.print("/{s}", .{self.id});
-    }
-};
-
-fn Field(comptime T: type) type {
-    return std.meta.FieldEnum(T);
-}
-
-fn Filter(comptime T: type) type {
-    const F = Field(T);
-
-    // TODO: OR support?
+pub fn Query(comptime language: Language) type {
     return struct {
-        const Self = @This();
+        pub const Get = struct {
+            id: []const u8,
 
-        const Operator = enum {
-            like,
-            not,
-            eq,
-            neq,
-            gte,
-            lte,
-            gt,
-            lt,
-            null,
-            not_null,
+            fn url(self: *const Get, writer: *Writer) !void {
+                try writer.print("/{s}", .{self.id});
+            }
         };
 
-        const Value = union(enum) {
-            const V = @This();
+        fn Field(comptime T: type) type {
+            return std.meta.FieldEnum(T);
+        }
 
-            none: void,
-            str: []const u8,
-            int: usize,
-            float: f64,
+        fn Filter(comptime T: type) type {
+            const F = Field(T);
 
-            pub fn from(value: anytype) V {
-                const Val = @TypeOf(value);
-                if (Val == []const u8) {
-                    return .{ .str = value };
-                }
+            // TODO: OR support?
+            return struct {
+                const Self = @This();
 
-                return switch (@typeInfo(Val)) {
-                    .int => .{ .int = value },
-                    .float => .{ .float = value },
-                    else => unreachable,
+                const Operator = enum {
+                    like,
+                    not,
+                    eq,
+                    neq,
+                    gte,
+                    lte,
+                    gt,
+                    lt,
+                    null,
+                    not_null,
                 };
-            }
-        };
 
-        field: F,
-        op: Operator,
-        value: Value,
+                const Value = union(enum) {
+                    const V = @This();
 
-        fn TypeOf(comptime field: F) type {
-            return @FieldType(T, @tagName(field));
-        }
+                    none: void,
+                    str: []const u8,
+                    int: usize,
+                    float: f64,
 
-        /// laxist equality filter
-        pub fn like(comptime field: F, value: TypeOf(field)) Self {
-            return .{
-                .field = field,
-                .op = .like,
-                .value = .from(value),
-            };
-        }
+                    pub fn from(value: anytype) V {
+                        const Val = @TypeOf(value);
+                        if (Val == []const u8) {
+                            return .{ .str = value };
+                        }
 
-        /// laxist different filter
-        pub fn not(comptime field: F, value: TypeOf(field)) Self {
-            return .{
-                .field = field,
-                .op = .not,
-                .value = .from(value),
-            };
-        }
+                        return switch (@typeInfo(Val)) {
+                            .int => .{ .int = value },
+                            .float => .{ .float = value },
+                            else => unreachable,
+                        };
+                    }
+                };
 
-        /// strict equality filter
-        pub fn eq(comptime field: F, value: TypeOf(field)) Self {
-            return .{
-                .field = field,
-                .op = .eq,
-                .value = .from(value),
-            };
-        }
+                field: F,
+                op: Operator,
+                value: Value,
 
-        /// strict different filter
-        pub fn neq(comptime field: F, value: TypeOf(field)) Self {
-            return .{
-                .field = field,
-                .op = .neq,
-                .value = .from(value),
-            };
-        }
-
-        /// greater or equal
-        pub fn gte(comptime field: F, value: usize) Self {
-            return .{
-                .field = field,
-                .op = .gte,
-                .value = .from(value),
-            };
-        }
-
-        /// lesser or equal
-        pub fn lte(comptime field: F, value: usize) Self {
-            return .{
-                .field = field,
-                .op = .lte,
-                .value = .from(value),
-            };
-        }
-
-        /// greater
-        pub fn gt(comptime field: F, value: usize) Self {
-            return .{
-                .field = field,
-                .op = .gt,
-                .value = .from(value),
-            };
-        }
-
-        /// lesser
-        pub fn lt(comptime field: F, value: usize) Self {
-            return .{
-                .field = field,
-                .op = .lt,
-                .value = .from(value),
-            };
-        }
-
-        /// is null
-        pub fn isNull(comptime field: F) Self {
-            return .{
-                .field = field,
-                .op = .null,
-                .value = .none,
-            };
-        }
-
-        /// is not null
-        pub fn notNull(comptime field: F) Self {
-            return .{
-                .field = field,
-                .op = .not_null,
-                .value = .none,
-            };
-        }
-
-        pub fn format(self: Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-            var percent_writer: percent_encoding.Writer = .init(writer);
-            var percent = percent_writer.writer();
-
-            // field=
-            try writer.print("{t}=", .{self.field});
-
-            switch (self.op) {
-                .like => try writer.print("like:", .{}),
-                .not => try writer.print("not:", .{}),
-                .eq => try writer.print("eq:", .{}),
-                .neq => try writer.print("neq:", .{}),
-                .gte => try writer.print("gte:", .{}),
-                .lte => try writer.print("lte:", .{}),
-                .gt => try writer.print("gt:", .{}),
-                .lt => try writer.print("lt:", .{}),
-                .null => try writer.print("null:", .{}),
-                .not_null => try writer.print("notnull:", .{}),
-            }
-
-            switch (self.value) {
-                .none => {},
-                .str => |str| try percent.print("{s}", .{str}),
-                // numbers likely dont need to be escaped, but just in case
-                .int => |int| try percent.print("{d}", .{int}),
-                .float => |float| try percent.print("{d}", .{float}),
-            }
-        }
-    };
-}
-
-fn Order(comptime T: type) type {
-    const F = Field(T);
-
-    return struct {
-        const Self = @This();
-
-        field: F,
-        direction: enum {
-            ascending,
-            descending,
-        },
-
-        pub fn asc(comptime field: F) Self {
-            return .{ .field = field, .direction = .ascending };
-        }
-
-        pub fn desc(comptime field: F) Self {
-            return .{ .field = field, .direction = .descending };
-        }
-
-        pub fn format(self: Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-            switch (self) {
-                .ascending => {},
-                .descending => try writer.writeByte('-'),
-            }
-
-            switch (self) {
-                .ascending,
-                .descending,
-                => |field| try writer.print("{t}", .{field}),
-            }
-        }
-    };
-}
-
-pub fn Params(comptime T: type) type {
-    return struct {
-        const Self = @This();
-
-        where: ?[]const Filter(T) = null,
-        page: ?usize = null,
-        page_size: ?usize = null,
-        order_by: ?[]const Order(T) = null,
-
-        fn isEmpty(self: *const Self) bool {
-            inline for (std.meta.fields(Self)) |field| {
-                if (@field(self, field.name)) |_| {
-                    return false;
+                fn TypeOf(comptime field: F) type {
+                    return @FieldType(T, @tagName(field));
                 }
-            }
 
-            return true;
-        }
-
-        fn url(self: *const Self, writer: *Writer) !void {
-            if (self.isEmpty()) return;
-
-            try writer.writeByte('?');
-
-            var needs_ampersand = false;
-            if (self.where) |filters| {
-                for (filters) |filter| {
-                    defer needs_ampersand = true;
-                    if (needs_ampersand) try writer.writeByte('&');
-                    try writer.print("{f}", .{filter});
-                }
-            }
-
-            if (self.page) |page| {
-                defer needs_ampersand = true;
-                if (needs_ampersand) try writer.writeByte('&');
-                try writer.print("pagination:page={d}", .{page});
-            }
-
-            if (self.page_size) |page_size| {
-                defer needs_ampersand = true;
-                if (needs_ampersand) try writer.writeByte('&');
-                try writer.print("pagination:itemsPerPage={d}", .{page_size});
-            }
-
-            if (self.order_by) |orders| {
-                for (orders) |order| {
-                    defer needs_ampersand = true;
-                    if (needs_ampersand) try writer.writeByte('&');
-
-                    const value = switch (order.direction) {
-                        .ascending => "ASC",
-                        .descending => "DESC",
+                /// laxist equality filter
+                pub fn like(comptime field: F, value: TypeOf(field)) Self {
+                    return .{
+                        .field = field,
+                        .op = .like,
+                        .value = .from(value),
                     };
-                    try writer.print("sort:field={t}&sort:order={s}", .{ order.field, value });
                 }
-            }
+
+                /// laxist different filter
+                pub fn not(comptime field: F, value: TypeOf(field)) Self {
+                    return .{
+                        .field = field,
+                        .op = .not,
+                        .value = .from(value),
+                    };
+                }
+
+                /// strict equality filter
+                pub fn eq(comptime field: F, value: TypeOf(field)) Self {
+                    return .{
+                        .field = field,
+                        .op = .eq,
+                        .value = .from(value),
+                    };
+                }
+
+                /// strict different filter
+                pub fn neq(comptime field: F, value: TypeOf(field)) Self {
+                    return .{
+                        .field = field,
+                        .op = .neq,
+                        .value = .from(value),
+                    };
+                }
+
+                /// greater or equal
+                pub fn gte(comptime field: F, value: usize) Self {
+                    return .{
+                        .field = field,
+                        .op = .gte,
+                        .value = .from(value),
+                    };
+                }
+
+                /// lesser or equal
+                pub fn lte(comptime field: F, value: usize) Self {
+                    return .{
+                        .field = field,
+                        .op = .lte,
+                        .value = .from(value),
+                    };
+                }
+
+                /// greater
+                pub fn gt(comptime field: F, value: usize) Self {
+                    return .{
+                        .field = field,
+                        .op = .gt,
+                        .value = .from(value),
+                    };
+                }
+
+                /// lesser
+                pub fn lt(comptime field: F, value: usize) Self {
+                    return .{
+                        .field = field,
+                        .op = .lt,
+                        .value = .from(value),
+                    };
+                }
+
+                /// is null
+                pub fn isNull(comptime field: F) Self {
+                    return .{
+                        .field = field,
+                        .op = .null,
+                        .value = .none,
+                    };
+                }
+
+                /// is not null
+                pub fn notNull(comptime field: F) Self {
+                    return .{
+                        .field = field,
+                        .op = .not_null,
+                        .value = .none,
+                    };
+                }
+
+                pub fn format(self: Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+                    var percent_writer: percent_encoding.Writer = .init(writer);
+                    var percent = percent_writer.writer();
+
+                    // field=
+                    try writer.print("{t}=", .{self.field});
+
+                    switch (self.op) {
+                        .like => try writer.print("like:", .{}),
+                        .not => try writer.print("not:", .{}),
+                        .eq => try writer.print("eq:", .{}),
+                        .neq => try writer.print("neq:", .{}),
+                        .gte => try writer.print("gte:", .{}),
+                        .lte => try writer.print("lte:", .{}),
+                        .gt => try writer.print("gt:", .{}),
+                        .lt => try writer.print("lt:", .{}),
+                        .null => try writer.print("null:", .{}),
+                        .not_null => try writer.print("notnull:", .{}),
+                    }
+
+                    switch (self.value) {
+                        .none => {},
+                        .str => |str| try percent.print("{s}", .{str}),
+                        // numbers likely dont need to be escaped, but just in case
+                        .int => |int| try percent.print("{d}", .{int}),
+                        .float => |float| try percent.print("{d}", .{float}),
+                    }
+                }
+            };
         }
-    };
-}
 
-pub fn Iterator(comptime T: type) type {
-    return struct {
-        const Self = @This();
+        fn Order(comptime T: type) type {
+            const F = Field(T);
 
-        language: Language,
-        params: Params(T),
+            return struct {
+                const Self = @This();
 
-        pub fn new(language: Language, params: Params(T)) Self {
-            return .{
-                .language = language,
-                .params = .{
-                    .where = params.where,
-                    .page = params.page orelse 1,
-                    .page_size = params.page_size,
-                    .order_by = params.order_by,
+                field: F,
+                direction: enum {
+                    ascending,
+                    descending,
                 },
+
+                pub fn asc(comptime field: F) Self {
+                    return .{ .field = field, .direction = .ascending };
+                }
+
+                pub fn desc(comptime field: F) Self {
+                    return .{ .field = field, .direction = .descending };
+                }
+
+                pub fn format(self: Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+                    switch (self) {
+                        .ascending => {},
+                        .descending => try writer.writeByte('-'),
+                    }
+
+                    switch (self) {
+                        .ascending,
+                        .descending,
+                        => |field| try writer.print("{t}", .{field}),
+                    }
+                }
             };
         }
 
-        pub fn next(self: *Self, allocator: Allocator) !?[]const T {
-            defer {
-                self.params.page = if (self.params.page) |page|
-                    page + 1
-                else
-                    unreachable;
-            }
+        pub fn Params(comptime T: type) type {
+            return struct {
+                const Self = @This();
 
-            const q: Q(T, .many) = .{ .params = self.params };
+                where: ?[]const Filter(T) = null,
+                page: ?usize = null,
+                page_size: ?usize = null,
+                order_by: ?[]const Order(T) = null,
 
-            const cards: []const T = try q.run(allocator, self.language);
-            if (cards.len == 0) {
-                return null;
-            }
+                fn isEmpty(self: *const Self) bool {
+                    inline for (std.meta.fields(Self)) |field| {
+                        if (@field(self, field.name)) |_| {
+                            return false;
+                        }
+                    }
 
-            return cards;
-        }
-    };
-}
+                    return true;
+                }
 
-pub fn Q(
-    comptime T: type,
-    comptime quantity: enum { one, many },
-) type {
-    const Value = switch (quantity) {
-        .one => T,
-        .many => []const T,
-    };
+                fn url(self: *const Self, writer: *Writer) !void {
+                    if (self.isEmpty()) return;
 
-    return struct {
-        const Self = @This();
+                    try writer.writeByte('?');
 
-        params: switch (quantity) {
-            .one => Get,
-            .many => Params(T),
-        },
+                    var needs_ampersand = false;
+                    if (self.where) |filters| {
+                        for (filters) |filter| {
+                            defer needs_ampersand = true;
+                            if (needs_ampersand) try writer.writeByte('&');
+                            try writer.print("{f}", .{filter});
+                        }
+                    }
 
-        fn requestUrl(self: *const Self, allocator: Allocator, language: Language) ![]const u8 {
-            var writer: std.Io.Writer.Allocating = .init(allocator);
-            defer writer.deinit();
+                    if (self.page) |page| {
+                        defer needs_ampersand = true;
+                        if (needs_ampersand) try writer.writeByte('&');
+                        try writer.print("pagination:page={d}", .{page});
+                    }
 
-            const w = &writer.writer;
+                    if (self.page_size) |page_size| {
+                        defer needs_ampersand = true;
+                        if (needs_ampersand) try writer.writeByte('&');
+                        try writer.print("pagination:itemsPerPage={d}", .{page_size});
+                    }
 
-            try w.print("{s}/{t}/{s}", .{ base_url, language, T.url });
-            try self.params.url(w);
+                    if (self.order_by) |orders| {
+                        for (orders) |order| {
+                            defer needs_ampersand = true;
+                            if (needs_ampersand) try writer.writeByte('&');
 
-            return writer.toOwnedSlice();
-        }
-
-        fn sendRequest(self: *const Self, allocator: Allocator, language: Language) ![]const u8 {
-            const url = try self.requestUrl(allocator, language);
-            defer allocator.free(url);
-
-            errdefer std.debug.print("url: {s}\n", .{url});
-
-            var http_client: std.http.Client = .{
-                .allocator = allocator,
+                            const value = switch (order.direction) {
+                                .ascending => "ASC",
+                                .descending => "DESC",
+                            };
+                            try writer.print("sort:field={t}&sort:order={s}", .{ order.field, value });
+                        }
+                    }
+                }
             };
-            defer http_client.deinit();
-
-            var writer: std.Io.Writer.Allocating = .init(allocator);
-
-            const result = try http_client.fetch(.{
-                .method = .GET,
-                .location = .{ .url = url },
-                .response_writer = &writer.writer,
-            });
-
-            // don't bother trying to decode payload, we messed up
-            const status = result.status;
-            switch (status.class()) {
-                .informational,
-                .success,
-                .redirect,
-                => {},
-                .client_error,
-                .server_error,
-                => return error.ServerErrorStatus,
-            }
-
-            return writer.toOwnedSlice();
         }
 
-        pub fn run(self: Self, allocator: Allocator, language: Language) !Value {
-            const body = try self.sendRequest(allocator, language);
-            defer allocator.free(body);
+        pub fn Iterator(comptime T: type) type {
+            return struct {
+                const Self = @This();
 
-            errdefer std.debug.print("body: {s}\n", .{body});
+                params: Params(T),
 
-            var scanner: std.json.Scanner = .initCompleteInput(allocator, body);
-            defer scanner.deinit();
+                pub fn new(params: Params(T)) Self {
+                    return .{
+                        .params = .{
+                            .where = params.where,
+                            .page = params.page orelse 1,
+                            .page_size = params.page_size,
+                            .order_by = params.order_by,
+                        },
+                    };
+                }
 
-            const options: std.json.ParseOptions = .{
-                // dont want references into potentially-freed memory
-                .allocate = .alloc_always,
-                .ignore_unknown_fields = true,
-                .max_value_len = std.math.maxInt(usize),
+                pub fn next(self: *Self, allocator: Allocator) !?[]const T {
+                    defer {
+                        self.params.page = if (self.params.page) |page|
+                            page + 1
+                        else
+                            unreachable;
+                    }
+
+                    const q: Q(T, .many) = .{ .params = self.params };
+
+                    const cards: []const T = try q.run(allocator);
+                    if (cards.len == 0) {
+                        return null;
+                    }
+
+                    return cards;
+                }
+            };
+        }
+
+        pub fn Q(
+            comptime T: type,
+            comptime quantity: enum { one, many },
+        ) type {
+            const Value = switch (quantity) {
+                .one => T,
+                .many => []const T,
             };
 
-            const value: std.json.Value = try .jsonParse(allocator, &scanner, options);
+            return struct {
+                const Self = @This();
 
-            const parsed = try std.json.parseFromValue(Value, allocator, value, options);
-            // TODO: deinit somehow
+                params: switch (quantity) {
+                    .one => Get,
+                    .many => Params(T),
+                },
 
-            return parsed.value;
+                fn requestUrl(self: *const Self, allocator: Allocator) ![]const u8 {
+                    var writer: std.Io.Writer.Allocating = .init(allocator);
+                    defer writer.deinit();
+
+                    const w = &writer.writer;
+
+                    const url = comptime std.fmt.comptimePrint("{s}/{t}/{s}", .{ base_url, language, T.url });
+                    _ = try w.write(url);
+
+                    try self.params.url(w);
+
+                    return writer.toOwnedSlice();
+                }
+
+                fn sendRequest(self: *const Self, allocator: Allocator) ![]const u8 {
+                    const url = try self.requestUrl(allocator);
+                    defer allocator.free(url);
+
+                    errdefer std.debug.print("url: {s}\n", .{url});
+
+                    var http_client: std.http.Client = .{
+                        .allocator = allocator,
+                    };
+                    defer http_client.deinit();
+
+                    var writer: std.Io.Writer.Allocating = .init(allocator);
+
+                    const result = try http_client.fetch(.{
+                        .method = .GET,
+                        .location = .{ .url = url },
+                        .response_writer = &writer.writer,
+                    });
+
+                    // don't bother trying to decode payload, we messed up
+                    const status = result.status;
+                    switch (status.class()) {
+                        .informational,
+                        .success,
+                        .redirect,
+                        => {},
+                        .client_error,
+                        .server_error,
+                        => return error.ServerErrorStatus,
+                    }
+
+                    return writer.toOwnedSlice();
+                }
+
+                pub fn run(self: Self, allocator: Allocator) !Value {
+                    const body = try self.sendRequest(allocator);
+                    defer allocator.free(body);
+
+                    errdefer std.debug.print("body: {s}\n", .{body});
+
+                    var scanner: std.json.Scanner = .initCompleteInput(allocator, body);
+                    defer scanner.deinit();
+
+                    const options: std.json.ParseOptions = .{
+                        // dont want references into potentially-freed memory
+                        .allocate = .alloc_always,
+                        .ignore_unknown_fields = true,
+                        .max_value_len = std.math.maxInt(usize),
+                    };
+
+                    const value: std.json.Value = try .jsonParse(allocator, &scanner, options);
+
+                    const parsed = try std.json.parseFromValue(Value, allocator, value, options);
+                    // TODO: deinit somehow
+
+                    return parsed.value;
+                }
+            };
         }
     };
 }

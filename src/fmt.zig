@@ -18,7 +18,7 @@ pub fn printSlice(
         else => |len| {
             try writer.print("{{ ", .{});
 
-            for (slice[0..len - 1]) |item| {
+            for (slice[0 .. len - 1]) |item| {
                 try writer.writeByte(' ');
                 try writer.print(format, .{item});
                 try writer.writeByte(',');
@@ -28,6 +28,6 @@ pub fn printSlice(
             try writer.print(format, .{slice[len - 1]});
 
             try writer.print(" }}", .{});
-        }
+        },
     }
 }
