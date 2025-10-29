@@ -1,5 +1,5 @@
 const std = @import("std");
-const ptz = @import("ptz").Sdk(.en);
+const sdk = @import("ptz").Sdk(.en);
 
 const Type = enum {
     card,
@@ -28,7 +28,7 @@ fn usage(msg: []const u8) !void {
 }
 
 fn handleCard(allocator: std.mem.Allocator, stdout: *std.Io.Writer, name: []const u8) !void {
-    var iterator = ptz.Card.all(.{
+    var iterator = sdk.Card.all(.{
         .where = &.{
             .like(.name, name),
         },
@@ -36,7 +36,7 @@ fn handleCard(allocator: std.mem.Allocator, stdout: *std.Io.Writer, name: []cons
 
     while (try iterator.next(allocator)) |briefs| {
         for (briefs) |brief| {
-            const card: ptz.Card = try .get(allocator, .{
+            const card: sdk.Card = try .get(allocator, .{
                 .id = brief.id,
             });
 
@@ -46,7 +46,7 @@ fn handleCard(allocator: std.mem.Allocator, stdout: *std.Io.Writer, name: []cons
 }
 
 fn handleSerie(allocator: std.mem.Allocator, stdout: *std.Io.Writer, name: []const u8) !void {
-    var iterator = ptz.Serie.all(.{
+    var iterator = sdk.Serie.all(.{
         .where = &.{
             .like(.name, name),
         },
@@ -54,7 +54,7 @@ fn handleSerie(allocator: std.mem.Allocator, stdout: *std.Io.Writer, name: []con
 
     while (try iterator.next(allocator)) |briefs| {
         for (briefs) |brief| {
-            const serie: ptz.Serie = try .get(allocator, .{
+            const serie: sdk.Serie = try .get(allocator, .{
                 .id = brief.id,
             });
 
@@ -64,7 +64,7 @@ fn handleSerie(allocator: std.mem.Allocator, stdout: *std.Io.Writer, name: []con
 }
 
 fn handleSet(allocator: std.mem.Allocator, stdout: *std.Io.Writer, name: []const u8) !void {
-    var iterator = ptz.Set.all(.{
+    var iterator = sdk.Set.all(.{
         .where = &.{
             .like(.name, name),
         },
@@ -72,7 +72,7 @@ fn handleSet(allocator: std.mem.Allocator, stdout: *std.Io.Writer, name: []const
 
     while (try iterator.next(allocator)) |briefs| {
         for (briefs) |brief| {
-            const set: ptz.Set = try .get(allocator, .{
+            const set: sdk.Set = try .get(allocator, .{
                 .id = brief.id,
             });
 
