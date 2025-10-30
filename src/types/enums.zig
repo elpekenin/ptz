@@ -88,6 +88,15 @@ pub fn Enums(comptime language: Language) type {
             else => unreachable,
         };
 
+        pub const RegulationMark = enum {
+            D,
+            E,
+            F,
+            G,
+            H,
+            I,
+        };
+
         pub const Stage = switch (language) {
             .en => enum {
                 Basic,

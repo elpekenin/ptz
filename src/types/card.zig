@@ -10,18 +10,13 @@ const Legality = @import("Legality.zig");
 const Set = @import("set.zig").Set;
 const Pricing = @import("pricing.zig").Pricing;
 
-// TODO:
-// legal: Legality,
-// regulationMark: ?[]const u8 = null, // TODO: enum
-// variants_detailed: []Variants.Detailed,
-
 pub fn Card(comptime language: Language) type {
-    const query = Query(language);
-    const E = Enums(language);
-    const P = Pricing(language);
+    const LangQuery = Query(language);
+    const LangEnum = Enums(language);
+    const LangPricing = Pricing(language);
 
     const Ability = struct {
-        type: E.AbilityType,
+        type: LangEnum.AbilityType,
         // FIXME: these 2 should be required
         name: ?[]const u8 = null,
         effect: ?[]const u8 = null,
@@ -30,14 +25,14 @@ pub fn Card(comptime language: Language) type {
             self: @This(),
             writer: *std.Io.Writer,
         ) std.Io.Writer.Error!void {
-            try writer.print("{{ .type = {t},", .{self.type});
+            try writer.print("{{ .type = {t}", .{self.type});
 
             if (self.name) |name| {
-                try writer.print(" .name = {s},", .{name});
+                try writer.print(", .name = {s}", .{name});
             }
 
             if (self.effect) |effect| {
-                try writer.print(" .effect = {s},", .{effect});
+                try writer.print(", .effect = {s}", .{effect});
             }
 
             try writer.print(" }}", .{});
@@ -81,7 +76,7 @@ pub fn Card(comptime language: Language) type {
     };
 
     const Attack = struct {
-        cost: []const E.Type,
+        cost: []const LangEnum.Type,
         name: []const u8,
         effect: ?[]const u8 = null,
         damage: ?Damage = null,
@@ -92,12 +87,12 @@ pub fn Card(comptime language: Language) type {
         ) std.Io.Writer.Error!void {
             try writer.print("{{ .cost = ", .{});
 
-            try fmt.printSlice(E.Type, writer, "{t}", self.cost);
+            try fmt.printSlice(LangEnum.Type, writer, "{t}", self.cost);
 
-            try writer.print(", .name = {s},", .{self.name});
+            try writer.print(", .name = {s}", .{self.name});
 
             if (self.effect) |effect| {
-                try writer.print(" .effect = {s},", .{effect});
+                try writer.print(", .effect = {s}", .{effect});
             }
 
             try writer.print(" }}", .{});
@@ -161,7 +156,7 @@ pub fn Card(comptime language: Language) type {
             @"20+",
         };
 
-        type: E.Type,
+        type: LangEnum.Type,
         value: Value,
 
         pub fn format(
@@ -186,43 +181,148 @@ pub fn Card(comptime language: Language) type {
         }
     };
 
-    const Common = struct {
-        id: []const u8,
-        localId: []const u8,
-        name: []const u8,
-        image: ?Image = null,
-        illustrator: ?[]const u8 = null,
-        rarity: ?E.Rarity = null,
-        set: Set(language).Brief,
-        variants: Variants,
-        boosters: ?[]const Booster = null,
-        pricing: ?P = null,
-        updated: []const u8, // date
+    const VariantDetailed = struct {
+        type: []const u8,
+        size: ?[]const u8 = null,
+        stamp: ?[]const []const u8 = null,
+        foil: ?[]const u8 = null,
+
+        pub fn format(
+            self: @This(),
+            writer: *std.Io.Writer,
+        ) std.Io.Writer.Error!void {
+            try writer.print("{{ .type = {s}", .{self.type});
+
+            if (self.size) |size| {
+                try writer.print(", .size = {s}", .{size});
+            }
+
+            if (self.stamp) |stamp| {
+                try writer.print(", .stamp = ", .{});
+                try fmt.printSlice([]const u8, writer, "{s}", stamp);
+            }
+
+            if (self.foil) |foil| {
+                try writer.print(", .foil = {s}", .{foil});
+            }
+
+            try writer.print(" }}", .{});
+        }
     };
 
-    const Pokemon = struct {
+    // common args
+    const Common = struct {
+        const Self = @This();
+
+        id: []const u8,
+        localId: []const u8,
+        name: []const u8,
+        image: ?Image,
+        illustrator: ?[]const u8,
+        rarity: ?LangEnum.Rarity,
+        set: Set(language).Brief,
+        variants: Variants,
+        variant_detailed: ?[]const VariantDetailed,
+        boosters: ?[]const Booster,
+        pricing: ?LangPricing,
+        updated: []const u8, // date
+        legal: Legality,
+        regulationMark: ?LangEnum.RegulationMark,
+
+        fn from(value: anytype) Self {
+            return . {
+                .id = value.id,
+                .localId = value.localId,
+                .name = value.name,
+                .image = value.image,
+                .illustrator = value.illustrator,
+                .rarity = value.rarity,
+                .set = value.set,
+                .variants = value.variants,
+                .variant_detailed = value.variant_detailed,
+                .boosters = value.boosters,
+                .pricing = value.pricing,
+                .updated = value.updated,
+                .legal = value.legal,
+                .regulationMark = value.regulationMark,
+            };
+        }
+
+        fn formatFields(value: anytype, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+            // for autocompletion in editor to work
+            const self: Self = from(value);
+
+            try writer.print(".id = {s}, .local_id = {s}, .name = {s}", .{
+                self.id,
+                self.localId,
+                self.name,
+            });
+
+            if (self.image) |image| {
+                try writer.print(", .image = {f}", .{image});
+            }
+
+            if (self.illustrator) |illustrator| {
+                try writer.print(", .illustrator = {s}", .{illustrator});
+            }
+
+            if (self.rarity) |rarity| {
+                try writer.print(", .rarity = {t}", .{rarity});
+            }
+
+            try writer.print(", .set = {f}, .variants = {f}", .{ self.set, self.variants });
+
+            if (self.variant_detailed) |detailed| {
+                try writer.print(", .variant_detailed = ", .{});
+                try fmt.printSlice(VariantDetailed, writer, "{f}", detailed);
+            }
+
+            if (self.boosters) |boosters| {
+                try writer.print(", .boosters = ", .{});
+                try fmt.printSlice(Booster, writer, "{f}", boosters);
+            }
+
+            if (self.pricing) |pricing| {
+                try writer.print(", .pricing = {f}", .{pricing});
+            }
+
+            try writer.print(", .updated = {s}", .{self.updated});
+
+            try writer.print(", .legal = {f}", .{self.legal});
+
+            if (self.regulationMark) |regulation_mark| {
+                try writer.print(", .regulationMark = {t}", .{regulation_mark});
+            }
+        }
+    };
+
+    // Pokemon
+    const P = struct {
         id: []const u8,
         localId: []const u8,
         name: []const u8,
         image: ?Image = null,
         illustrator: ?[]const u8 = null,
-        rarity: ?E.Rarity = null,
+        rarity: ?LangEnum.Rarity = null,
         set: Set(language).Brief,
         variants: Variants,
+        variant_detailed: ?[]const VariantDetailed = null,
         boosters: ?[]const Booster = null,
-        pricing: ?P = null,
+        pricing: ?LangPricing = null,
         updated: []const u8,
+        legal: Legality,
+        regulationMark: ?LangEnum.RegulationMark = null,
 
         //
 
         dexId: ?DexId = null,
         hp: ?usize = null,
-        types: ?[]const E.Type = null,
+        types: ?[]const LangEnum.Type = null,
         evolveFrom: ?[]const u8 = null,
         description: ?[]const u8 = null,
         level: ?[]const u8 = null,
-        stage: ?E.Stage = null,
-        suffix: ?E.Suffix = null,
+        stage: ?LangEnum.Stage = null,
+        suffix: ?LangEnum.Suffix = null,
         item: ?Item = null,
         abilities: ?[]const Ability = null,
         attacks: ?[]const Attack = null,
@@ -246,144 +346,177 @@ pub fn Card(comptime language: Language) type {
             self: @This(),
             writer: *std.Io.Writer,
         ) std.Io.Writer.Error!void {
+            try writer.print("{{ ", .{});
+
+            try Common.formatFields(self, writer);
+
             if (self.dexId) |dexId| {
-                try writer.print(" .dexId = {f},", .{dexId});
+                try writer.print(", .dexId = {f}", .{dexId});
             }
 
             if (self.hp) |hp| {
-                try writer.print(" .hp = {d},", .{hp});
+                try writer.print(", .hp = {d}", .{hp});
             }
 
             if (self.types) |types| {
-                try writer.print(" .types = ", .{});
-                try fmt.printSlice(E.Type, writer, "{t}", types);
-                try writer.writeByte(',');
+                try writer.print(", .types = ", .{});
+                try fmt.printSlice(LangEnum.Type, writer, "{t}", types);
             }
 
             if (self.evolveFrom) |evolveFrom| {
-                try writer.print(" .evolveFrom = {s},", .{evolveFrom});
+                try writer.print(", .evolveFrom = {s}", .{evolveFrom});
             }
 
             if (self.description) |description| {
-                try writer.print(" .description = {s},", .{description});
+                try writer.print(", .description = {s}", .{description});
             }
 
             if (self.level) |level| {
-                try writer.print(" .level = {s},", .{level});
+                try writer.print(", .level = {s}", .{level});
             }
 
             if (self.stage) |stage| {
-                try writer.print(" .stage = {t},", .{stage});
+                try writer.print(", .stage = {t}", .{stage});
             }
 
             if (self.suffix) |suffix| {
-                try writer.print(" .suffix = {t},", .{suffix});
+                try writer.print(", .suffix = {t}", .{suffix});
             }
 
             if (self.item) |item| {
-                try writer.print(" .item = {f},", .{item});
+                try writer.print(", .item = {f}", .{item});
             }
 
             if (self.abilities) |abilities| {
-                try writer.print(" .abilities = ", .{});
+                try writer.print(", .abilities = ", .{});
                 try fmt.printSlice(Ability, writer, "{f}", abilities);
-                try writer.writeByte(',');
             }
 
             if (self.attacks) |attacks| {
-                try writer.print(" .attacks = ", .{});
+                try writer.print(", .attacks = ", .{});
                 try fmt.printSlice(Attack, writer, "{f}", attacks);
-                try writer.writeByte(',');
             }
 
             if (self.weaknesses) |weaknesses| {
-                try writer.print(" .weaknesses = ", .{});
+                try writer.print(", .weaknesses = ", .{});
                 try fmt.printSlice(Effectiveness, writer, "{f}", weaknesses);
-                try writer.writeByte(',');
             }
 
             if (self.resistances) |resistances| {
-                try writer.print(" .resistances = ", .{});
+                try writer.print(", .resistances = ", .{});
                 try fmt.printSlice(Effectiveness, writer, "{f}", resistances);
-                try writer.writeByte(',');
             }
 
             if (self.retreat) |retreat| {
-                try writer.print(" .retreat = {d},", .{retreat});
+                try writer.print(", .retreat = {d}", .{retreat});
             }
+
+            try writer.print(" }}", .{});
         }
     };
 
-    const Trainer = struct {
+    // Trainer
+    const T = struct {
         id: []const u8,
         localId: []const u8,
         name: []const u8,
         image: ?Image = null,
         illustrator: ?[]const u8 = null,
-        rarity: ?E.Rarity = null,
+        rarity: ?LangEnum.Rarity = null,
         set: Set(language).Brief,
         variants: Variants,
+        variant_detailed: ?[]const VariantDetailed = null,
         boosters: ?[]const Booster = null,
-        pricing: ?P = null,
+        pricing: ?LangPricing = null,
         updated: []const u8,
+        legal: Legality,
+        regulationMark: ?LangEnum.RegulationMark = null,
 
         //
 
         // FIXME: these should be required (?)
         effect: ?[]const u8 = null,
-        trainerType: ?E.TrainerType = null,
+        trainerType: ?LangEnum.TrainerType = null,
 
         pub fn format(
             self: @This(),
             writer: *std.Io.Writer,
         ) std.Io.Writer.Error!void {
+            try writer.print("{{ ", .{});
+
+            try Common.formatFields(self, writer);
+
             if (self.effect) |effect| {
-                try writer.print(" .effect = {s},", .{effect});
+                try writer.print(", .effect = {s}", .{effect});
             }
 
             if (self.trainerType) |trainerType| {
-                try writer.print(" .trainerType = {t},", .{trainerType});
+                try writer.print(", .trainerType = {t}", .{trainerType});
             }
+
+            try writer.print(" }}", .{});
         }
     };
 
-    const Energy = struct {
+    // Energy
+    const E = struct {
         id: []const u8,
         localId: []const u8,
         name: []const u8,
         image: ?Image = null,
         illustrator: ?[]const u8 = null,
-        rarity: ?E.Rarity = null,
+        rarity: ?LangEnum.Rarity = null,
         set: Set(language).Brief,
         variants: Variants,
+        variant_detailed: ?[]const VariantDetailed = null,
         boosters: ?[]const Booster = null,
-        pricing: ?P = null,
+        pricing: ?LangPricing = null,
         updated: []const u8,
+        legal: Legality,
+        regulationMark: ?LangEnum.RegulationMark = null,
 
         //
 
         effect: []const u8,
-        energyType: E.EnergyType,
+        energyType: LangEnum.EnergyType,
 
         pub fn format(
             self: @This(),
             writer: *std.Io.Writer,
         ) std.Io.Writer.Error!void {
-            try writer.print(" .effect = {s}, .type = {t},", .{ self.effect, self.energyType });
+            try writer.print("{{ ", .{});
+
+            try Common.formatFields(self, writer);
+
+            try writer.print(", .effect = {s}, .type = {t}", .{ self.effect, self.energyType });
+
+            try writer.print(" }}", .{});
         }
     };
 
     // assert that types have all the common fields, and they are the right type
     comptime {
-        for (.{ Pokemon, Trainer, Energy }) |T| {
+        for (.{ P, T, E }) |Type| {
             for (@typeInfo(Common).@"struct".fields) |field| {
-                std.debug.assert(@FieldType(T, field.name) == field.type);
+                if (!@hasField(Type, field.name)) {
+                    const msg = std.fmt.comptimePrint("{} is missing field {s}", .{ Type, field.name });
+                    @compileError(msg);
+                }
+
+                if (@FieldType(Type, field.name) != field.type) {
+                    const msg = std.fmt.comptimePrint("{}.{s} must be of type {}", .{ Type, field.name, field.type });
+                    @compileError(msg);
+                }
             }
         }
     }
 
     return union(enum) {
         const Self = @This();
+
+        pub const Pokemon = P;
+        pub const Trainer = T;
+        pub const Energy = E;
 
         pub const url = "cards";
 
@@ -393,15 +526,15 @@ pub fn Card(comptime language: Language) type {
 
         // dummy type just to parse the category from the API's response
         const Raw = struct {
-            category: E.Category,
+            category: LangEnum.Category,
         };
 
-        pub fn get(allocator: std.mem.Allocator, params: query.Get) !Self {
-            const q: query.Q(Self, .one) = .{ .params = params };
+        pub fn get(allocator: std.mem.Allocator, params: LangQuery.Get) !Self {
+            const q: LangQuery.Q(Self, .one) = .{ .params = params };
             return q.run(allocator);
         }
 
-        pub fn all(params: query.Params(Brief)) query.Iterator(Brief) {
+        pub fn all(params: LangQuery.Params(Brief)) LangQuery.Iterator(Brief) {
             return Brief.iterator(params);
         }
 
@@ -413,7 +546,7 @@ pub fn Card(comptime language: Language) type {
             name: []const u8,
             image: ?Image = null,
 
-            pub fn iterator(params: query.Params(Brief)) query.Iterator(Brief) {
+            pub fn iterator(params: LangQuery.Params(Brief)) LangQuery.Iterator(Brief) {
                 return .new(params);
             }
 
@@ -421,10 +554,10 @@ pub fn Card(comptime language: Language) type {
                 self: Brief,
                 writer: *std.Io.Writer,
             ) std.Io.Writer.Error!void {
-                try writer.print("{{ .id = {s}, .localId = {s}, .name = {s},", .{ self.id, self.localId, self.name });
+                try writer.print("{{ .id = {s}, .localId = {s}, .name = {s}", .{ self.id, self.localId, self.name });
 
                 if (self.image) |image| {
-                    try writer.print(" .image = {f},", .{image});
+                    try writer.print(", .image = {f}", .{image});
                 }
 
                 try writer.print(" }}", .{});
@@ -461,64 +594,19 @@ pub fn Card(comptime language: Language) type {
             }
         }
 
-        fn commonFormat(comptime T: type, value: T, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-            std.debug.assert(T == Pokemon or T == Energy or T == Trainer);
-
-            try writer.print(".id = {s}, .local_id = {s}, .name = {s},", .{
-                value.id,
-                value.localId,
-                value.name,
-            });
-
-            if (value.image) |image| {
-                try writer.print(" .image = {f},", .{image});
-            }
-
-            if (value.illustrator) |illustrator| {
-                try writer.print(" .illustrator = {s},", .{illustrator});
-            }
-
-            if (value.rarity) |rarity| {
-                try writer.print(" .rarity = {t},", .{rarity});
-            }
-
-            try writer.print(" .set = {f}, .variants = {f},", .{ value.set, value.variants });
-
-            if (value.boosters) |boosters| {
-                try writer.print(" .boosters = ", .{});
-                try fmt.printSlice(Booster, writer, "{f}", boosters);
-                try writer.writeByte(',');
-            }
-
-            if (value.pricing) |pricing| {
-                try writer.print(" .pricing = {f},", .{pricing});
-            }
-
-            try writer.print(" .updated = {s},", .{value.updated});
-        }
-
         pub fn format(
             self: Self,
             writer: *std.Io.Writer,
         ) std.Io.Writer.Error!void {
-            try writer.print("{{ .{t} = {{ ", .{self});
+            try writer.print("{{ .{t} = ", .{self});
 
             switch (self) {
-                .pokemon => |value| {
-                    try commonFormat(Pokemon, value, writer);
-                    try writer.print("{f}", .{value});
-                },
-                .energy => |value| {
-                    try commonFormat(Energy, value, writer);
-                    try writer.print("{f}", .{value});
-                },
-                .trainer => |value| {
-                    try commonFormat(Trainer, value, writer);
-                    try writer.print("{f}", .{value});
-                },
+                .pokemon => |value| try writer.print("{f}", .{value}),
+                .energy => |value| try writer.print("{f}", .{value}),
+                .trainer => |value| try writer.print("{f}", .{value}),
             }
 
-            try writer.print(" }} }}", .{});
+            try writer.print(" }}", .{});
         }
     };
 }

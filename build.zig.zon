@@ -1,0 +1,12 @@
+.{
+    .name = .ptz,
+    .version = "0.0.1",
+    .minimum_zig_version = "0.16.0-dev.747+493ad58ff",
+    .fingerprint = 0x503395929a05eb09,
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
