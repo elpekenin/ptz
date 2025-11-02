@@ -1,5 +1,4 @@
 // Reference: https://github.com/tcgdex/cards-database/blob/master/interfaces.d.ts
-// TODO: Language-specific texts
 
 const Language = @import("../language.zig").Language;
 
@@ -14,7 +13,9 @@ pub fn Category(comptime language: Language) type {
     };
 }
 
-pub fn AbilityType(comptime language: Language) type {
+// TODO: Implement language-specific enums at some point, so far just treat them as free text
+
+fn AbilityType(comptime language: Language) type {
     return switch (language) {
         .en => enum {
             @"Pokemon Power",
@@ -27,7 +28,7 @@ pub fn AbilityType(comptime language: Language) type {
     };
 }
 
-pub fn EnergyType(comptime language: Language) type {
+fn EnergyType(comptime language: Language) type {
     return switch (language) {
         .en => enum {
             Normal,
@@ -37,12 +38,7 @@ pub fn EnergyType(comptime language: Language) type {
     };
 }
 
-pub const MoneyUnit = enum {
-    EUR,
-    USD,
-};
-
-pub fn Rarity(comptime language: Language) type {
+fn Rarity(comptime language: Language) type {
     return switch (language) {
         .en => enum {
             @"ACE SPEC Rare",
@@ -89,7 +85,7 @@ pub fn Rarity(comptime language: Language) type {
     };
 }
 
-pub const RegulationMark = enum {
+const RegulationMark = enum {
     D,
     E,
     F,
@@ -98,7 +94,7 @@ pub const RegulationMark = enum {
     I,
 };
 
-pub fn Stage(comptime language: Language) type {
+fn Stage(comptime language: Language) type {
     return switch (language) {
         .en => enum {
             Basic,
@@ -116,7 +112,8 @@ pub fn Stage(comptime language: Language) type {
         else => unreachable,
     };
 }
-pub fn Suffix(comptime language: Language) type {
+
+fn Suffix(comptime language: Language) type {
     return switch (language) {
         .en => enum {
             EX,
@@ -130,8 +127,7 @@ pub fn Suffix(comptime language: Language) type {
         else => unreachable,
     };
 }
-
-pub fn TrainerType(comptime language: Language) type {
+fn TrainerType(comptime language: Language) type {
     return switch (language) {
         .en => enum {
             Supporter,
@@ -147,7 +143,7 @@ pub fn TrainerType(comptime language: Language) type {
     };
 }
 
-pub fn Type(comptime language: Language) type {
+fn Type(comptime language: Language) type {
     return switch (language) {
         .en => enum {
             Colorless,

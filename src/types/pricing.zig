@@ -1,6 +1,10 @@
 const std = @import("std");
 
-const MoneyUnit = @import("enums.zig").MoneyUnit;
+// TODO: There might be others
+const Currency = enum {
+    EUR,
+    USD,
+};
 
 pub const Pricing = struct {
     const Cardmarket = struct {
@@ -31,7 +35,7 @@ pub const Pricing = struct {
             }
 
             if (self.unit) |unit| {
-                try writer.print(" .unit = {t},", .{unit});
+                try writer.print(" .unit = {s},", .{unit});
             }
 
             if (self.avg) |avg| {
@@ -125,7 +129,7 @@ pub const Pricing = struct {
         };
 
         updated: []const u8, // date
-        unit: MoneyUnit,
+        unit: Currency,
 
         // optional
         normal: ?Price = null,

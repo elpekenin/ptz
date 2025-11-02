@@ -138,29 +138,17 @@ const DexId = union(enum) {
 };
 
 const Effectiveness = struct {
-    const Value = enum {
-        @"×2",
-        @"−20",
-        @"-20",
-        @"+10",
-        @"+20",
-        @"+30",
-        @"+40",
-        @"10+",
-        @"20+",
-    };
-
     type: []const u8,
-    value: ?Value = null,
+    value: ?[]const u8 = null,
 
     pub fn format(
         self: @This(),
         writer: *std.Io.Writer,
     ) std.Io.Writer.Error!void {
-        try writer.print("{{ .type = {t}", .{self.type});
+        try writer.print("{{ .type = {s}", .{self.type});
 
         if (self.value) |value| {
-            try writer.print(", .value = {t}", .{value});
+            try writer.print(", .value = {s}", .{value});
         }
 
         try writer.print(" }}", .{});
@@ -270,7 +258,7 @@ pub fn Card(comptime language: Language) type {
             }
 
             if (self.rarity) |rarity| {
-                try writer.print(", .rarity = {t}", .{rarity});
+                try writer.print(", .rarity = {s}", .{rarity});
             }
 
             try writer.print(", .set = {f}, .variants = {f}", .{ self.set, self.variants });
@@ -294,7 +282,7 @@ pub fn Card(comptime language: Language) type {
             try writer.print(", .legal = {f}", .{self.legal});
 
             if (self.regulationMark) |regulation_mark| {
-                try writer.print(", .regulationMark = {t}", .{regulation_mark});
+                try writer.print(", .regulationMark = {s}", .{regulation_mark});
             }
         }
     };
@@ -457,7 +445,7 @@ pub fn Card(comptime language: Language) type {
                 }
 
                 if (self.trainerType) |trainerType| {
-                    try writer.print(", .trainerType = {t}", .{trainerType});
+                    try writer.print(", .trainerType = {s}", .{trainerType});
                 }
 
                 try writer.print(" }}", .{});
@@ -493,7 +481,7 @@ pub fn Card(comptime language: Language) type {
 
                 try Common.formatFields(self, writer);
 
-                try writer.print(", .effect = {s}, .type = {t}", .{ self.effect, self.energyType });
+                try writer.print(", .effect = {s}, .type = {s}", .{ self.effect, self.energyType });
 
                 try writer.print(" }}", .{});
             }
