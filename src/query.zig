@@ -360,8 +360,6 @@ pub fn Query(comptime language: Language) type {
                     const url = try self.requestUrl(allocator);
                     defer allocator.free(url);
 
-                    errdefer std.debug.print("url: {s}\n", .{url});
-
                     var http_client: std.http.Client = .{
                         .allocator = allocator,
                     };
@@ -393,8 +391,6 @@ pub fn Query(comptime language: Language) type {
                 pub fn run(self: Self, allocator: Allocator) !Value {
                     const body = try self.sendRequest(allocator);
                     defer allocator.free(body);
-
-                    errdefer std.debug.print("body: {s}\n", .{body});
 
                     var scanner: std.json.Scanner = .initCompleteInput(allocator, body);
                     defer scanner.deinit();
