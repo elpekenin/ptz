@@ -11,7 +11,7 @@ pub fn build(b: *std.Build) void {
 
     _ = b.addModule("ptz", .{
         .root_source_file = b.path("src/ptz.zig"),
-        .target =  target,
+        .target = target,
         .optimize = optimize,
     });
 }

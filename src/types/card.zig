@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
 const fmt = @import("../fmt.zig");
 const Language = @import("../language.zig").Language;
@@ -74,7 +75,7 @@ const Damage = union(enum) {
     }
 
     pub fn jsonParseFromValue(
-        allocator: std.mem.Allocator,
+        allocator: Allocator,
         source: std.json.Value,
         options: std.json.ParseOptions,
     ) std.json.ParseFromValueError!Damage {
@@ -109,7 +110,7 @@ const DexId = union(enum) {
     }
 
     pub fn jsonParseFromValue(
-        allocator: std.mem.Allocator,
+        allocator: Allocator,
         source: std.json.Value,
         options: std.json.ParseOptions,
     ) std.json.ParseFromValueError!DexId {
@@ -491,18 +492,21 @@ pub fn Card(comptime language: Language) type {
         trainer: Trainer,
         energy: Energy,
 
-        // dummy type just to parse the category from the API's response
-        const Raw = struct {
-            category: Category(language),
-        };
-
-        pub fn get(allocator: std.mem.Allocator, params: query.Get) !Self {
-            const q: query.Q(Self, .one) = .{ .params = params };
-            return q.run(allocator);
+        pub fn free(self: *Self, allocator: Allocator) void {
+            switch (self.*) {
+                .pokemon => allocator.free(std.mem.asBytes(&self.pokemon)),
+                .trainer => allocator.free(std.mem.asBytes(&self.trainer)),
+                .energy => allocator.free(std.mem.asBytes(&self.energy)),
+            }
         }
 
-        pub fn all(params: query.Params(Brief)) query.Iterator(Brief) {
-            return Brief.iterator(params);
+        pub fn get(allocator: Allocator, params: query.Get) !Self {
+            var q: query.Q(Self, .one) = .init(allocator, params);
+            return q.run();
+        }
+
+        pub fn all(allocator: Allocator, params: query.ParamsFor(Brief)) query.Iterator(Brief) {
+            return Brief.iterator(allocator, params);
         }
 
         pub const Brief = struct {
@@ -513,8 +517,8 @@ pub fn Card(comptime language: Language) type {
             name: []const u8,
             image: ?Image = null,
 
-            pub fn iterator(params: query.Params(Brief)) query.Iterator(Brief) {
-                return .new(params);
+            pub fn iterator(allocator: Allocator, params: query.ParamsFor(Brief)) query.Iterator(Brief) {
+                return .new(allocator, params);
             }
 
             pub fn format(
@@ -532,10 +536,15 @@ pub fn Card(comptime language: Language) type {
         };
 
         pub fn jsonParseFromValue(
-            allocator: std.mem.Allocator,
+            allocator: Allocator,
             source: std.json.Value,
             options: std.json.ParseOptions,
         ) std.json.ParseFromValueError!Self {
+            // dummy type just to parse the category from the API's response
+            const Raw = struct {
+                category: Category(language),
+            };
+
             const common = try std.json.parseFromValue(Raw, allocator, source, options);
             defer common.deinit();
 

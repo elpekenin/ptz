@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
 const fmt = @import("../fmt.zig");
 const Query = @import("../query.zig").Query;
@@ -41,13 +42,13 @@ pub fn Set(comptime language: Language) type {
         cards: []const Card(language).Brief,
         boosters: ?[]const Booster = null,
 
-        pub fn get(allocator: std.mem.Allocator, params: query.Get) !Self {
-            const q: query.Q(Self, .one) = .{ .params = params };
-            return q.run(allocator);
+        pub fn get(allocator: Allocator, params: query.Get) !Self {
+            var q: query.Q(Self, .one) = .init(allocator, params);
+            return q.run();
         }
 
-        pub fn all(params: query.Params(Brief)) query.Iterator(Brief) {
-            return Brief.iterator(params);
+        pub fn all(allocator: Allocator, params: query.ParamsFor(Brief)) query.Iterator(Brief) {
+            return Brief.iterator(allocator, params);
         }
 
         pub fn format(
@@ -94,8 +95,8 @@ pub fn Set(comptime language: Language) type {
             symbol: ?[]const u8 = null,
             cardCount: CardCount,
 
-            pub fn iterator(params: query.Params(Brief)) query.Iterator(Brief) {
-                return .new(params);
+            pub fn iterator(allocator: Allocator, params: query.ParamsFor(Brief)) query.Iterator(Brief) {
+                return .new(allocator, params);
             }
 
             pub fn format(

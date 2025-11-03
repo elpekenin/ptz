@@ -227,7 +227,7 @@ pub fn Query(comptime language: Language) type {
             };
         }
 
-        pub fn Params(comptime T: type) type {
+        pub fn ParamsFor(comptime T: type) type {
             return struct {
                 const Self = @This();
 
@@ -292,30 +292,30 @@ pub fn Query(comptime language: Language) type {
             return struct {
                 const Self = @This();
 
-                params: Params(T),
+                pub const Params = ParamsFor(T);
 
-                pub fn new(params: Params(T)) Self {
+                q: Q(T, .many),
+
+                pub fn init(allocator: Allocator, params: Params) Self {
                     return .{
-                        .params = .{
+                        .q = .init(allocator, .{
                             .where = params.where,
                             .page = params.page orelse 1,
                             .page_size = params.page_size,
                             .order_by = params.order_by,
-                        },
+                        }),
                     };
                 }
 
-                pub fn next(self: *Self, allocator: Allocator) !?[]const T {
-                    defer {
-                        self.params.page = if (self.params.page) |page|
-                            page + 1
-                        else
-                            unreachable;
-                    }
+                pub fn free(self: *const Self, items: []const T) void {
+                    self.q.allocator.free(items);
+                }
 
-                    const q: Q(T, .many) = .{ .params = self.params };
+                pub fn next(self: *Self) !?[]const T {
+                    // TODO?: optimize avoiding extra call to `run` if last query was empty already
+                    const cards = try self.q.run();
+                    self.q.advancePage();
 
-                    const cards: []const T = try q.run(allocator);
                     if (cards.len == 0) {
                         return null;
                     }
@@ -329,6 +329,11 @@ pub fn Query(comptime language: Language) type {
             comptime T: type,
             comptime quantity: enum { one, many },
         ) type {
+            const QueryParams = switch (quantity) {
+                .one => Get,
+                .many => ParamsFor(T),
+            };
+
             const Value = switch (quantity) {
                 .one => T,
                 .many => []const T,
@@ -337,13 +342,24 @@ pub fn Query(comptime language: Language) type {
             return struct {
                 const Self = @This();
 
-                params: switch (quantity) {
-                    .one => Get,
-                    .many => Params(T),
-                },
+                allocator: Allocator,
+                params: QueryParams,
 
-                fn requestUrl(self: *const Self, allocator: Allocator) ![]const u8 {
-                    var writer: std.Io.Writer.Allocating = .init(allocator);
+                pub fn init(allocator: Allocator, params: QueryParams) Self {
+                    return .{
+                        .allocator = allocator,
+                        .params = params,
+                    };
+                }
+
+                /// used by Iterator
+                pub fn advancePage(self: *Self) void {
+                    const current_page = self.params.page orelse 0;
+                    self.params.page = current_page + 1;
+                }
+
+                fn requestUrl(self: *const Self) ![]const u8 {
+                    var writer: std.Io.Writer.Allocating = .init(self.allocator);
                     defer writer.deinit();
 
                     const w = &writer.writer;
@@ -356,16 +372,16 @@ pub fn Query(comptime language: Language) type {
                     return writer.toOwnedSlice();
                 }
 
-                fn sendRequest(self: *const Self, allocator: Allocator) ![]const u8 {
-                    const url = try self.requestUrl(allocator);
-                    defer allocator.free(url);
+                fn sendRequest(self: *const Self) ![]const u8 {
+                    const url = try self.requestUrl();
+                    defer self.allocator.free(url);
 
                     var http_client: std.http.Client = .{
-                        .allocator = allocator,
+                        .allocator = self.allocator,
                     };
                     defer http_client.deinit();
 
-                    var writer: std.Io.Writer.Allocating = .init(allocator);
+                    var writer: std.Io.Writer.Allocating = .init(self.allocator);
 
                     const result = try http_client.fetch(.{
                         .method = .GET,
@@ -388,11 +404,11 @@ pub fn Query(comptime language: Language) type {
                     return writer.toOwnedSlice();
                 }
 
-                pub fn run(self: Self, allocator: Allocator) !Value {
-                    const body = try self.sendRequest(allocator);
-                    defer allocator.free(body);
+                pub fn run(self: *Self) !Value {
+                    const body = try self.sendRequest();
+                    defer self.allocator.free(body);
 
-                    var scanner: std.json.Scanner = .initCompleteInput(allocator, body);
+                    var scanner: std.json.Scanner = .initCompleteInput(self.allocator, body);
                     defer scanner.deinit();
 
                     const options: std.json.ParseOptions = .{
@@ -402,10 +418,10 @@ pub fn Query(comptime language: Language) type {
                         .max_value_len = std.math.maxInt(usize),
                     };
 
-                    const value: std.json.Value = try .jsonParse(allocator, &scanner, options);
+                    const value: std.json.Value = try .jsonParse(self.allocator, &scanner, options);
+                    // defer self.allocator.free(value); // TODO
 
-                    const parsed = try std.json.parseFromValue(Value, allocator, value, options);
-                    // TODO: deinit somehow
+                    const parsed = try std.json.parseFromValue(Value, self.allocator, value, options);
 
                     return parsed.value;
                 }
