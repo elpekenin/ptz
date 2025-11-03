@@ -8,7 +8,7 @@ const Booster = @import("Booster.zig");
 const Image = @import("Image.zig");
 const Legality = @import("Legality.zig");
 const Set = @import("set.zig").Set;
-const Pricing = @import("pricing.zig").Pricing;
+const Pricing = @import("Pricing.zig");
 
 const Ability = struct {
     type: []const u8,

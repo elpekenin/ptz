@@ -10,7 +10,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     _ = b.addModule("ptz", .{
-        .root_source_file = b.path("src/root.zig"),
+        .root_source_file = b.path("src/ptz.zig"),
         .target =  target,
         .optimize = optimize,
     });
