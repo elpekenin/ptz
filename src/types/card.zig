@@ -492,7 +492,7 @@ pub fn Card(comptime language: Language) type {
         trainer: Trainer,
         energy: Energy,
 
-        pub fn free(self: *Self, allocator: Allocator) void {
+        pub fn free(self: *const Self, allocator: Allocator) void {
             switch (self.*) {
                 .pokemon => allocator.free(std.mem.asBytes(&self.pokemon)),
                 .trainer => allocator.free(std.mem.asBytes(&self.trainer)),
