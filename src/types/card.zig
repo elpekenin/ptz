@@ -518,7 +518,7 @@ pub fn Card(comptime language: Language) type {
             image: ?Image = null,
 
             pub fn iterator(allocator: Allocator, params: query.ParamsFor(Brief)) query.Iterator(Brief) {
-                return .new(allocator, params);
+                return .init(allocator, params);
             }
 
             pub fn format(
