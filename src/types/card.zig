@@ -11,7 +11,7 @@ const Legality = @import("Legality.zig");
 const Set = @import("set.zig").Set;
 const Pricing = @import("Pricing.zig");
 
-const Ability = struct {
+pub const Ability = struct {
     type: []const u8,
     // FIXME: these 2 should be required
     name: ?[]const u8 = null,
@@ -35,7 +35,7 @@ const Ability = struct {
     }
 };
 
-const Attack = struct {
+pub const Attack = struct {
     cost: []const []const u8,
     name: ?[]const u8 = null, // ??
     effect: ?[]const u8 = null,
@@ -60,7 +60,7 @@ const Attack = struct {
     }
 };
 
-const Damage = union(enum) {
+pub const Damage = union(enum) {
     str: []const u8,
     int: usize,
 
@@ -95,7 +95,7 @@ const Damage = union(enum) {
 };
 
 // TODO: remove/simplify when values get unified upstream
-const DexId = union(enum) {
+pub const DexId = union(enum) {
     str: []const u8,
     int: usize,
 
@@ -138,7 +138,7 @@ const DexId = union(enum) {
     }
 };
 
-const Effectiveness = struct {
+pub const Effectiveness = struct {
     type: []const u8,
     value: ?[]const u8 = null,
 
@@ -156,7 +156,7 @@ const Effectiveness = struct {
     }
 };
 
-const Variants = struct {
+pub const Variants = struct {
     normal: bool,
     reverse: bool,
     holo: bool,
@@ -170,7 +170,7 @@ const Variants = struct {
     }
 };
 
-const VariantDetailed = struct {
+pub const VariantDetailed = struct {
     type: []const u8,
     size: ?[]const u8 = null,
     stamp: ?[]const []const u8 = null,

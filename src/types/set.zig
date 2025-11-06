@@ -10,7 +10,7 @@ const Legality = @import("Legality.zig");
 const Image = @import("Image.zig");
 const Serie = @import("serie.zig").Serie;
 
-const CardCount = struct {
+pub const CardCount = struct {
     total: usize,
     official: usize,
 
