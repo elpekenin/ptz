@@ -1,4 +1,9 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
+const ParseError = std.json.ParseError;
+const ParseOptions = std.json.ParseOptions;
+const Value = std.json.Value;
+const Writer = std.Io.Writer;
 
 const Image = @This();
 
@@ -15,31 +20,21 @@ pub const Extension = enum {
     jpg,
 };
 
-pub fn toUrl(self: *const Image, writer: *std.Io.Writer, resolution: Resolution, extension: Extension) !void {
+pub fn toUrl(self: *const Image, writer: *Writer, resolution: Resolution, extension: Extension) !void {
     try writer.print("{s}/{t}.{t}", .{ self.raw, resolution, extension });
 }
 
-pub fn jsonParseFromValue(
-    allocator: std.mem.Allocator,
-    source: std.json.Value,
-    options: std.json.ParseOptions,
-) std.json.ParseFromValueError!Image {
-    _ = allocator;
-    _ = options;
-
-    const url = switch (source) {
-        .string => |val| val,
-        else => return error.UnexpectedToken,
-    };
-
-    return .{
-        .raw = url,
+pub fn jsonParse(
+    allocator: Allocator,
+    source: anytype,
+    options: ParseOptions,
+) ParseError(@TypeOf(source.*))!Image {
+    return switch (try source.nextAlloc(allocator, options.allocate orelse .alloc_always)) {
+        .string, .allocated_string => |url| .{ .raw = url },
+        else => error.UnexpectedToken,
     };
 }
 
-pub fn format(
-    self: Image,
-    writer: *std.Io.Writer,
-) std.Io.Writer.Error!void {
+pub fn format(self: Image, writer: *Writer) Writer.Error!void {
     try self.toUrl(writer, .high, .jpg);
 }

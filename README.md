@@ -17,11 +17,11 @@ your_module.addImport("ptz", module);
 const sdk = @import("ptz").sdk(.en); // configure a language, en=english
 
 // create an iterator to go through all cards with "machamp" in their name
-const briefs = sdk.Card.all(.{
+var iterator = sdk.Card.all(.{
     .where = &.{
         .like(.name, "machamp" ),
     },
-})
+});
 
 // get the first batch
 const briefs = if (try iterator.next()) |briefs|
@@ -29,10 +29,18 @@ const briefs = if (try iterator.next()) |briefs|
 else
     return error.NoCardsFound;
 
+// don't forget to free memory!
+defer {
+    for (briefs) |brief| {
+        brief.deinit();
+    }
+}
+
 // get full info for the first card
 const card: sdk.Card = try .get(allocator, .{
     .id = briefs[0].id,
 });
+defer card.deinit();
 
 // show it
 try writer.print("{f}", .{card});

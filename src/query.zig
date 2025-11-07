@@ -2,10 +2,30 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Writer = std.Io.Writer;
 
+const meta = @import("meta.zig");
 const percent_encoding = @import("percent_encoding.zig");
 const Language = @import("language.zig").Language;
 
 const base_url = "https://api.tcgdex.net/v2";
+
+const Quantity = enum {
+    one,
+    many,
+};
+
+fn Parse(comptime T: type, comptime quantity: Quantity) type {
+    return switch (quantity) {
+        .one => T,
+        .many => []T,
+    };
+}
+
+fn Return(comptime T: type, comptime quantity: Quantity) type {
+    return switch (quantity) {
+        .one => T,
+        .many => []const T,
+    };
+}
 
 pub fn Query(comptime language: Language) type {
     return struct {
@@ -161,7 +181,7 @@ pub fn Query(comptime language: Language) type {
                     };
                 }
 
-                pub fn format(self: Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+                pub fn format(self: Self, writer: *Writer) Writer.Error!void {
                     var percent_writer: percent_encoding.Writer = .init(writer);
                     var percent = percent_writer.writer();
 
@@ -212,7 +232,7 @@ pub fn Query(comptime language: Language) type {
                     return .{ .field = field, .direction = .descending };
                 }
 
-                pub fn format(self: Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+                pub fn format(self: Self, writer: *Writer) Writer.Error!void {
                     switch (self) {
                         .ascending => {},
                         .descending => try writer.writeByte('-'),
@@ -307,36 +327,26 @@ pub fn Query(comptime language: Language) type {
                     };
                 }
 
-                pub fn free(self: *const Self, items: []const T) void {
-                    self.q.allocator.free(items);
-                }
-
                 pub fn next(self: *Self) !?[]const T {
                     // TODO?: optimize avoiding extra call to `run` if last query was empty already
-                    const cards = try self.q.run();
+                    const items = try self.q.run();
                     self.q.advancePage();
 
-                    if (cards.len == 0) {
+                    if (items.len == 0) {
                         return null;
                     }
 
-                    return cards;
+                    return items;
                 }
             };
         }
 
-        pub fn Q(
-            comptime T: type,
-            comptime quantity: enum { one, many },
-        ) type {
+        pub fn Q(comptime T: type, comptime quantity: Quantity) type {
+            meta.validateType(T);
+
             const QueryParams = switch (quantity) {
                 .one => Get,
                 .many => ParamsFor(T),
-            };
-
-            const Value = switch (quantity) {
-                .one => T,
-                .many => []const T,
             };
 
             return struct {
@@ -359,7 +369,7 @@ pub fn Query(comptime language: Language) type {
                 }
 
                 fn requestUrl(self: *const Self) ![]const u8 {
-                    var writer: std.Io.Writer.Allocating = .init(self.allocator);
+                    var writer: Writer.Allocating = .init(self.allocator);
                     defer writer.deinit();
 
                     const w = &writer.writer;
@@ -381,7 +391,8 @@ pub fn Query(comptime language: Language) type {
                     };
                     defer http_client.deinit();
 
-                    var writer: std.Io.Writer.Allocating = .init(self.allocator);
+                    var writer: Writer.Allocating = .init(self.allocator);
+                    defer writer.deinit();
 
                     const result = try http_client.fetch(.{
                         .method = .GET,
@@ -404,7 +415,7 @@ pub fn Query(comptime language: Language) type {
                     return writer.toOwnedSlice();
                 }
 
-                pub fn run(self: *Self) !Value {
+                pub fn run(self: *Self) !Return(T, quantity) {
                     const body = try self.sendRequest();
                     defer self.allocator.free(body);
 
@@ -418,10 +429,24 @@ pub fn Query(comptime language: Language) type {
                         .max_value_len = std.math.maxInt(usize),
                     };
 
-                    const value: std.json.Value = try .jsonParse(self.allocator, &scanner, options);
-                    // defer self.allocator.free(value); // TODO
+                    var parsed = try std.json.parseFromTokenSource(
+                        Parse(T, quantity),
+                        self.allocator,
+                        &scanner,
+                        options,
+                    );
 
-                    const parsed = try std.json.parseFromValue(Value, self.allocator, value, options);
+                    switch (quantity) {
+                        .one => meta.setArena(T, &parsed.value, parsed.arena),
+                        // when querying multiple values, only set `__arena` to the last one
+                        // this way, we only free after we are done with all of them
+                        .many => {
+                            const len = parsed.value.len;
+                            if (len > 0) {
+                                meta.setArena(T, &parsed.value[len - 1], parsed.arena);
+                            }
+                        },
+                    }
 
                     return parsed.value;
                 }

@@ -18,7 +18,6 @@ pub const Effectiveness = card.Effectiveness;
 pub const VariantDetailed = card.VariantDetailed;
 pub const Variants = card.Variants;
 
-
 pub fn Sdk(comptime language: Language) type {
     return struct {
         pub const Pricing = ptz.Pricing;

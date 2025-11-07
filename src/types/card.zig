@@ -1,7 +1,11 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ParseError = std.json.ParseError;
+const ParseOptions = std.json.ParseOptions;
+const Writer = std.Io.Writer;
 
 const fmt = @import("../fmt.zig");
+const meta = @import("../meta.zig");
 const Language = @import("../language.zig").Language;
 const Query = @import("../query.zig").Query;
 const Category = @import("enums.zig").Category;
@@ -17,10 +21,7 @@ pub const Ability = struct {
     name: ?[]const u8 = null,
     effect: ?[]const u8 = null,
 
-    pub fn format(
-        self: Ability,
-        writer: *std.Io.Writer,
-    ) std.Io.Writer.Error!void {
+    pub fn format(self: Ability, writer: *Writer) Writer.Error!void {
         try writer.print("{{ .type = {s}", .{self.type});
 
         if (self.name) |name| {
@@ -41,10 +42,7 @@ pub const Attack = struct {
     effect: ?[]const u8 = null,
     damage: ?Damage = null,
 
-    pub fn format(
-        self: Attack,
-        writer: *std.Io.Writer,
-    ) std.Io.Writer.Error!void {
+    pub fn format(self: Attack, writer: *Writer) Writer.Error!void {
         try writer.print("{{ .cost = ", .{});
         try fmt.printSlice([]const u8, writer, "{s}", self.cost);
 
@@ -64,33 +62,24 @@ pub const Damage = union(enum) {
     str: []const u8,
     int: usize,
 
-    pub fn format(
-        self: Damage,
-        writer: *std.Io.Writer,
-    ) std.Io.Writer.Error!void {
+    pub fn format(self: Damage, writer: *Writer) Writer.Error!void {
         switch (self) {
             .str => |str| try writer.print("{s}", .{str}),
             .int => |int| try writer.print("{d}", .{int}),
         }
     }
 
-    pub fn jsonParseFromValue(
+    pub fn jsonParse(
         allocator: Allocator,
-        source: std.json.Value,
-        options: std.json.ParseOptions,
-    ) std.json.ParseFromValueError!Damage {
-        _ = allocator;
-        _ = options;
-
-        switch (source) {
-            .integer => |int| {
-                return .{ .int = @intCast(int) };
-            },
-            .string => |str| {
-                return .{ .str = str };
-            },
-            else => return error.UnexpectedToken,
-        }
+        source: anytype,
+        options: ParseOptions,
+    ) ParseError(@TypeOf(source.*))!Damage {
+        return switch (try source.nextAlloc(allocator, options.allocate orelse .alloc_always)) {
+            // TODO: free slice?
+            .number, .allocated_number => |buf| .{ .int = try std.fmt.parseInt(usize, buf, 10) },
+            .string => |str| .{ .str = str },
+            else => error.UnexpectedToken,
+        };
     }
 };
 
@@ -99,39 +88,30 @@ pub const DexId = union(enum) {
     str: []const u8,
     int: usize,
 
-    pub fn format(
-        self: DexId,
-        writer: *std.Io.Writer,
-    ) std.Io.Writer.Error!void {
+    pub fn format(self: DexId, writer: *Writer) Writer.Error!void {
         switch (self) {
             .str => |str| try writer.print("{s}", .{str}),
             .int => |int| try writer.print("{d}", .{int}),
         }
     }
 
-    pub fn jsonParseFromValue(
+    pub fn jsonParse(
         allocator: Allocator,
-        source: std.json.Value,
-        options: std.json.ParseOptions,
-    ) std.json.ParseFromValueError!DexId {
-        _ = allocator;
-        _ = options;
-
-        switch (source) {
-            .string => |str| {
-                return .{ .str = str };
-            },
-            .array => |arr| {
-                if (arr.items.len != 1) {
-                    return error.LengthMismatch;
-                }
-
-                const int = switch (arr.items[0]) {
-                    .integer => |int| int,
-                    else => return error.UnexpectedToken,
+        source: anytype,
+        options: ParseOptions,
+    ) ParseError(@TypeOf(source.*))!DexId {
+        switch (try source.peekNextTokenType()) {
+            .string => {
+                return switch (try source.nextAlloc(allocator, options.allocate orelse .alloc_always)) {
+                    .string, .allocated_string => |url| .{ .str = url },
+                    else => error.UnexpectedToken,
                 };
+            },
+            .array_begin => {
+                const ids = try std.json.innerParse([]const usize, allocator, source, options);
+                if (ids.len != 1) return error.LengthMismatch;
 
-                return .{ .int = @intCast(int) };
+                return .{ .int = ids[0] };
             },
             else => return error.UnexpectedToken,
         }
@@ -142,10 +122,7 @@ pub const Effectiveness = struct {
     type: []const u8,
     value: ?[]const u8 = null,
 
-    pub fn format(
-        self: @This(),
-        writer: *std.Io.Writer,
-    ) std.Io.Writer.Error!void {
+    pub fn format(self: Effectiveness, writer: *Writer) Writer.Error!void {
         try writer.print("{{ .type = {s}", .{self.type});
 
         if (self.value) |value| {
@@ -162,10 +139,7 @@ pub const Variants = struct {
     holo: bool,
     firstEdition: bool,
 
-    pub fn format(
-        self: Variants,
-        writer: *std.Io.Writer,
-    ) std.Io.Writer.Error!void {
+    pub fn format(self: Variants, writer: *Writer) Writer.Error!void {
         try writer.print("{{ .normal = {}, .reverse = {}, .holo ={}, .firstEdition = {} }}", .{ self.normal, self.reverse, self.holo, self.firstEdition });
     }
 };
@@ -176,10 +150,7 @@ pub const VariantDetailed = struct {
     stamp: ?[]const []const u8 = null,
     foil: ?[]const u8 = null,
 
-    pub fn format(
-        self: VariantDetailed,
-        writer: *std.Io.Writer,
-    ) std.Io.Writer.Error!void {
+    pub fn format(self: VariantDetailed, writer: *Writer) Writer.Error!void {
         try writer.print("{{ .type = {s}", .{self.type});
 
         if (self.size) |size| {
@@ -240,7 +211,7 @@ pub fn Card(comptime language: Language) type {
             };
         }
 
-        fn formatFields(value: anytype, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        fn formatFields(value: anytype, writer: *Writer) Writer.Error!void {
             // for autocompletion in editor to work
             const self: Self = from(value);
 
@@ -289,11 +260,15 @@ pub fn Card(comptime language: Language) type {
     };
 
     return union(enum) {
-        const Self = @This();
+        const C = @This();
 
         pub const url = "cards";
 
         pub const Pokemon = struct {
+            const P = @This();
+
+            __arena: ?*meta.Empty = null,
+
             id: []const u8,
             localId: []const u8,
             name: []const u8,
@@ -330,18 +305,16 @@ pub fn Card(comptime language: Language) type {
                 name: []const u8,
                 effect: []const u8,
 
-                pub fn format(
-                    self: Item,
-                    writer: *std.Io.Writer,
-                ) std.Io.Writer.Error!void {
+                pub fn format(self: Item, writer: *Writer) Writer.Error!void {
                     try writer.print("{{ .name = {s}, .effect = {s} }}", .{ self.name, self.effect });
                 }
             };
 
-            pub fn format(
-                self: @This(),
-                writer: *std.Io.Writer,
-            ) std.Io.Writer.Error!void {
+            pub fn deinit(self: P) void {
+                meta.deinit(P, self);
+            }
+
+            pub fn format(self: P, writer: *Writer) Writer.Error!void {
                 try writer.print("{{ ", .{});
 
                 try Common.formatFields(self, writer);
@@ -412,6 +385,10 @@ pub fn Card(comptime language: Language) type {
         };
 
         pub const Trainer = struct {
+            const T = @This();
+
+            __arena: ?*meta.Empty = null,
+
             id: []const u8,
             localId: []const u8,
             name: []const u8,
@@ -433,10 +410,11 @@ pub fn Card(comptime language: Language) type {
             effect: ?[]const u8 = null,
             trainerType: ?[]const u8 = null,
 
-            pub fn format(
-                self: @This(),
-                writer: *std.Io.Writer,
-            ) std.Io.Writer.Error!void {
+            pub fn deinit(self: T) void {
+                meta.deinit(T, self);
+            }
+
+            pub fn format(self: T, writer: *Writer) Writer.Error!void {
                 try writer.print("{{ ", .{});
 
                 try Common.formatFields(self, writer);
@@ -454,6 +432,10 @@ pub fn Card(comptime language: Language) type {
         };
 
         pub const Energy = struct {
+            const E = @This();
+
+            __arena: ?*meta.Empty = null,
+
             id: []const u8,
             localId: []const u8,
             name: []const u8,
@@ -474,10 +456,11 @@ pub fn Card(comptime language: Language) type {
             effect: []const u8,
             energyType: []const u8,
 
-            pub fn format(
-                self: @This(),
-                writer: *std.Io.Writer,
-            ) std.Io.Writer.Error!void {
+            pub fn deinit(self: E) void {
+                meta.deinit(E, self);
+            }
+
+            pub fn format(self: E, writer: *Writer) Writer.Error!void {
                 try writer.print("{{ ", .{});
 
                 try Common.formatFields(self, writer);
@@ -492,16 +475,24 @@ pub fn Card(comptime language: Language) type {
         trainer: Trainer,
         energy: Energy,
 
-        pub fn free(self: *const Self, allocator: Allocator) void {
+        pub fn __setArena(self: *C, arena: *meta.Empty) void {
             switch (self.*) {
-                .pokemon => allocator.free(std.mem.asBytes(&self.pokemon)),
-                .trainer => allocator.free(std.mem.asBytes(&self.trainer)),
-                .energy => allocator.free(std.mem.asBytes(&self.energy)),
+                .pokemon => self.pokemon.__arena = arena,
+                .trainer => self.trainer.__arena = arena,
+                .energy => self.energy.__arena = arena,
             }
         }
 
-        pub fn get(allocator: Allocator, params: query.Get) !Self {
-            var q: query.Q(Self, .one) = .init(allocator, params);
+        pub fn deinit(self: C) void {
+            switch (self) {
+                .pokemon => self.pokemon.deinit(),
+                .trainer => self.trainer.deinit(),
+                .energy => self.energy.deinit(),
+            }
+        }
+
+        pub fn get(allocator: Allocator, params: query.Get) !C {
+            var q: query.Q(C, .one) = .init(allocator, params);
             return q.run();
         }
 
@@ -510,21 +501,29 @@ pub fn Card(comptime language: Language) type {
         }
 
         pub const Brief = struct {
-            pub const url = Self.url;
+            pub const url = C.url;
+
+            __arena: ?*meta.Empty = null,
 
             id: []const u8,
             localId: []const u8,
             name: []const u8,
             image: ?Image = null,
 
+            pub fn deinit(self: Brief) void {
+                meta.deinit(Brief, self);
+            }
+
+            pub fn get(allocator: Allocator, params: query.Get) !Brief {
+                var q: query.Q(Brief, .one) = .init(allocator, params);
+                return q.run();
+            }
+
             pub fn iterator(allocator: Allocator, params: query.ParamsFor(Brief)) query.Iterator(Brief) {
                 return .init(allocator, params);
             }
 
-            pub fn format(
-                self: Brief,
-                writer: *std.Io.Writer,
-            ) std.Io.Writer.Error!void {
+            pub fn format(self: Brief, writer: *Writer) Writer.Error!void {
                 try writer.print("{{ .id = {s}, .localId = {s}, .name = {s}", .{ self.id, self.localId, self.name });
 
                 if (self.image) |image| {
@@ -535,51 +534,49 @@ pub fn Card(comptime language: Language) type {
             }
         };
 
-        pub fn jsonParseFromValue(
+        pub fn jsonParse(
             allocator: Allocator,
-            source: std.json.Value,
-            options: std.json.ParseOptions,
-        ) std.json.ParseFromValueError!Self {
+            source: anytype,
+            options: ParseOptions,
+        ) ParseError(@TypeOf(source.*))!C {
             // dummy type just to parse the category from the API's response
             const Raw = struct {
                 category: Category(language),
             };
 
-            const common = try std.json.parseFromValue(Raw, allocator, source, options);
+            // create an ephimeral scanner for the dummy type, not to mess original's state
+            var common_source: std.json.Scanner = .initCompleteInput(allocator, source.input);
+            defer common_source.deinit();
+
+            const common = try std.json.parseFromTokenSource(Raw, allocator, &common_source, options);
             defer common.deinit();
 
             switch (common.value.category) {
                 .Pokemon => {
-                    const parsed = try std.json.parseFromValue(Pokemon, allocator, source, options);
-                    defer parsed.deinit();
-
-                    return .{ .pokemon = parsed.value };
-                },
-                .Energy => {
-                    const parsed = try std.json.parseFromValue(Energy, allocator, source, options);
-                    defer parsed.deinit();
-
-                    return .{ .energy = parsed.value };
+                    var pokemon = try std.json.parseFromTokenSource(Pokemon, allocator, source, options);
+                    meta.setArena(Pokemon, &pokemon.value, pokemon.arena);
+                    return .{ .pokemon = pokemon.value };
                 },
                 .Trainer => {
-                    const parsed = try std.json.parseFromValue(Trainer, allocator, source, options);
-                    defer parsed.deinit();
-
-                    return .{ .trainer = parsed.value };
+                    var trainer = try std.json.parseFromTokenSource(Trainer, allocator, source, options);
+                    meta.setArena(Trainer, &trainer.value, trainer.arena);
+                    return .{ .trainer = trainer.value };
+                },
+                .Energy => {
+                    var energy = try std.json.parseFromTokenSource(Energy, allocator, source, options);
+                    meta.setArena(Energy, &energy.value, energy.arena);
+                    return .{ .energy = energy.value };
                 },
             }
         }
 
-        pub fn format(
-            self: Self,
-            writer: *std.Io.Writer,
-        ) std.Io.Writer.Error!void {
+        pub fn format(self: C, writer: *Writer) Writer.Error!void {
             try writer.print("{{ .{t} = ", .{self});
 
             switch (self) {
                 .pokemon => |value| try writer.print("{f}", .{value}),
-                .energy => |value| try writer.print("{f}", .{value}),
                 .trainer => |value| try writer.print("{f}", .{value}),
+                .energy => |value| try writer.print("{f}", .{value}),
             }
 
             try writer.print(" }}", .{});

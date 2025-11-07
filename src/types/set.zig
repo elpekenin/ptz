@@ -1,7 +1,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const Writer = std.Io.Writer;
 
 const fmt = @import("../fmt.zig");
+const meta = @import("../meta.zig");
 const Query = @import("../query.zig").Query;
 const Language = @import("../language.zig").Language;
 const Booster = @import("Booster.zig");
@@ -14,10 +16,7 @@ pub const CardCount = struct {
     total: usize,
     official: usize,
 
-    pub fn format(
-        self: CardCount,
-        writer: *std.Io.Writer,
-    ) std.Io.Writer.Error!void {
+    pub fn format(self: CardCount, writer: *Writer) Writer.Error!void {
         try writer.print("{{ .total = {d}, .official = {d} }}", .{ self.total, self.official });
     }
 };
@@ -26,9 +25,11 @@ pub fn Set(comptime language: Language) type {
     const query = Query(language);
 
     return struct {
-        const Self = @This();
+        const S = @This();
 
         pub const url = "sets";
+
+        __arena: ?*meta.Empty = null,
 
         id: []const u8,
         name: []const u8,
@@ -42,8 +43,12 @@ pub fn Set(comptime language: Language) type {
         cards: []const Card(language).Brief,
         boosters: ?[]const Booster = null,
 
-        pub fn get(allocator: Allocator, params: query.Get) !Self {
-            var q: query.Q(Self, .one) = .init(allocator, params);
+        pub fn deinit(self: S) void {
+            meta.deinit(S, self);
+        }
+
+        pub fn get(allocator: Allocator, params: query.Get) !S {
+            var q: query.Q(S, .one) = .init(allocator, params);
             return q.run();
         }
 
@@ -51,10 +56,7 @@ pub fn Set(comptime language: Language) type {
             return Brief.iterator(allocator, params);
         }
 
-        pub fn format(
-            self: Self,
-            writer: *std.Io.Writer,
-        ) std.Io.Writer.Error!void {
+        pub fn format(self: S, writer: *Writer) Writer.Error!void {
             try writer.print("{{ .id = {s}, .name = {s},", .{ self.id, self.name });
 
             if (self.logo) |logo| {
@@ -87,7 +89,7 @@ pub fn Set(comptime language: Language) type {
         }
 
         pub const Brief = struct {
-            pub const url = Self.url;
+            pub const url = S.url;
 
             id: []const u8,
             name: []const u8,
@@ -95,14 +97,16 @@ pub fn Set(comptime language: Language) type {
             symbol: ?[]const u8 = null,
             cardCount: CardCount,
 
+            pub fn get(allocator: Allocator, params: query.Get) !Brief {
+                var q: query.Q(Brief, .one) = .init(allocator, params);
+                return q.run();
+            }
+
             pub fn iterator(allocator: Allocator, params: query.ParamsFor(Brief)) query.Iterator(Brief) {
                 return .new(allocator, params);
             }
 
-            pub fn format(
-                self: Brief,
-                writer: *std.Io.Writer,
-            ) std.Io.Writer.Error!void {
+            pub fn format(self: Brief, writer: *Writer) Writer.Error!void {
                 try writer.print("{{ .id = {s}, .name = {s},", .{ self.id, self.name });
 
                 if (self.logo) |logo| {

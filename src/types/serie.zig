@@ -1,7 +1,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const Writer = std.Io.Writer;
 
 const fmt = @import("../fmt.zig");
+const meta = @import("../meta.zig");
 const Query = @import("../query.zig").Query;
 const Language = @import("../language.zig").Language;
 const Image = @import("Image.zig");
@@ -15,10 +17,16 @@ pub fn Serie(comptime language: Language) type {
 
         pub const url = "series";
 
+        __arena: ?*meta.Empty = null,
+
         sets: []const Set(language).Brief,
         id: []const u8,
         name: []const u8,
         logo: ?Image = null,
+
+        pub fn deinit(self: Self) void {
+            meta.deinit(Self, self);
+        }
 
         pub fn get(allocator: Allocator, params: query.Get) !Self {
             var q: query.Q(Self, .one) = .init(allocator, params);
@@ -29,10 +37,7 @@ pub fn Serie(comptime language: Language) type {
             return Brief.iterator(allocator, params);
         }
 
-        pub fn format(
-            self: Self,
-            writer: *std.Io.Writer,
-        ) std.Io.Writer.Error!void {
+        pub fn format(self: Self, writer: *Writer) Writer.Error!void {
             try writer.print("{{ ", .{});
 
             try writer.print(" .sets = ", .{});
@@ -55,14 +60,16 @@ pub fn Serie(comptime language: Language) type {
             name: []const u8,
             logo: ?Image = null,
 
+            pub fn get(allocator: Allocator, params: query.Get) !Brief {
+                var q: query.Q(Brief, .one) = .init(allocator, params);
+                return q.run();
+            }
+
             pub fn iterator(allocator: Allocator, params: query.ParamsFor(Brief)) query.Iterator(Brief) {
                 return .new(allocator, params);
             }
 
-            pub fn format(
-                self: Brief,
-                writer: *std.Io.Writer,
-            ) std.Io.Writer.Error!void {
+            pub fn format(self: Brief, writer: *Writer) Writer.Error!void {
                 try writer.print("{{ .id = {s}, .name = {s},", .{ self.id, self.name });
 
                 if (self.logo) |logo| {

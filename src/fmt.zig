@@ -1,13 +1,14 @@
 //! Formatting utilities
 
 const std = @import("std");
+const Writer = std.Io.Writer;
 
 pub fn printSlice(
     comptime T: type,
-    writer: *std.Io.Writer,
+    writer: *Writer,
     comptime format: []const u8,
     slice: []const T,
-) std.Io.Writer.Error!void {
+) Writer.Error!void {
     switch (slice.len) {
         0 => try writer.print("{{}}", .{}),
         1 => {

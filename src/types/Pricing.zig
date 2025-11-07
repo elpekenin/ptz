@@ -1,4 +1,5 @@
 const std = @import("std");
+const Writer = std.Io.Writer;
 
 const Pricing = @This();
 
@@ -25,10 +26,7 @@ const Cardmarket = struct {
     @"avg7-holo": ?f32 = null,
     @"avg30-holo": ?f32 = null,
 
-    pub fn format(
-        self: Cardmarket,
-        writer: *std.Io.Writer,
-    ) std.Io.Writer.Error!void {
+    pub fn format(self: Cardmarket, writer: *Writer) Writer.Error!void {
         try writer.writeByte('{');
 
         if (self.updated) |updated| {
@@ -99,10 +97,7 @@ const Tcgplayer = struct {
         marketPrice: ?f32 = null,
         directLowPrice: ?f32 = null,
 
-        pub fn format(
-            self: Price,
-            writer: *std.Io.Writer,
-        ) std.Io.Writer.Error!void {
+        pub fn format(self: Price, writer: *Writer) Writer.Error!void {
             try writer.writeByte('{');
 
             if (self.lowPrice) |lowPrice| {
@@ -141,10 +136,7 @@ const Tcgplayer = struct {
     unlimited: ?Price = null,
     @"unlimited-holofoil": ?Price = null,
 
-    pub fn format(
-        self: Tcgplayer,
-        writer: *std.Io.Writer,
-    ) std.Io.Writer.Error!void {
+    pub fn format(self: Tcgplayer, writer: *Writer) Writer.Error!void {
         try writer.print("{{ .updated = {s}, .unit = {t},", .{ self.updated, self.unit });
 
         if (self.normal) |normal| {
@@ -182,10 +174,7 @@ const Tcgplayer = struct {
 cardmarket: ?Cardmarket = null,
 tcgplayer: ?Tcgplayer = null,
 
-pub fn format(
-    self: Pricing,
-    writer: *std.Io.Writer,
-) std.Io.Writer.Error!void {
+pub fn format(self: Pricing, writer: *Writer) Writer.Error!void {
     try writer.writeByte('{');
 
     if (self.cardmarket) |cardmarket| {
