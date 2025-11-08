@@ -74,12 +74,21 @@ pub const Damage = union(enum) {
         source: anytype,
         options: ParseOptions,
     ) ParseError(@TypeOf(source.*))!Damage {
-        return switch (try source.nextAlloc(allocator, options.allocate orelse .alloc_always)) {
-            // TODO: free slice?
-            .number, .allocated_number => |buf| .{ .int = try std.fmt.parseInt(usize, buf, 10) },
-            .string => |str| .{ .str = str },
-            else => error.UnexpectedToken,
-        };
+        const token: std.json.Token = try source.nextAlloc(allocator, options.allocate orelse .alloc_always);
+        switch (token) {
+            .number, .allocated_number => |buf| {
+                const int = try std.fmt.parseInt(usize, buf, 10);
+                return .{
+                    .int = int,
+                };
+            },
+            .string, .allocated_string => |str| {
+                return .{
+                    .str = str,
+                };
+            },
+            else => return error.UnexpectedToken,
+        }
     }
 };
 
@@ -100,18 +109,26 @@ pub const DexId = union(enum) {
         source: anytype,
         options: ParseOptions,
     ) ParseError(@TypeOf(source.*))!DexId {
-        switch (try source.peekNextTokenType()) {
+        const token_type: std.json.TokenType = try source.peekNextTokenType();
+        switch (token_type) {
             .string => {
-                return switch (try source.nextAlloc(allocator, options.allocate orelse .alloc_always)) {
-                    .string, .allocated_string => |url| .{ .str = url },
-                    else => error.UnexpectedToken,
-                };
+                const token: std.json.Token = try source.nextAlloc(allocator, options.allocate orelse .alloc_always);
+                switch (token) {
+                    .string, .allocated_string => |str| {
+                        return .{
+                            .str = str,
+                        };
+                    },
+                    else => unreachable,
+                }
             },
             .array_begin => {
                 const ids = try std.json.innerParse([]const usize, allocator, source, options);
                 if (ids.len != 1) return error.LengthMismatch;
 
-                return .{ .int = ids[0] };
+                return .{
+                    .int = ids[0],
+                };
             },
             else => return error.UnexpectedToken,
         }

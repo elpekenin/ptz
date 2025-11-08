@@ -29,10 +29,15 @@ pub fn jsonParse(
     source: anytype,
     options: ParseOptions,
 ) ParseError(@TypeOf(source.*))!Image {
-    return switch (try source.nextAlloc(allocator, options.allocate orelse .alloc_always)) {
-        .string, .allocated_string => |url| .{ .raw = url },
-        else => error.UnexpectedToken,
-    };
+    const token: std.json.Token = try source.nextAlloc(allocator, options.allocate orelse .alloc_always);
+    switch (token) {
+        .string, .allocated_string => |str| {
+            return .{
+                .raw = str,
+            };
+        },
+        else => return error.UnexpectedToken,
+    }
 }
 
 pub fn format(self: Image, writer: *Writer) Writer.Error!void {

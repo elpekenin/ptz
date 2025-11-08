@@ -1,3 +1,6 @@
+// TODO: on `jsonParse()`, figure out what to do with allocated vs non-allocated
+//       is it good as is, or shall we perform have to allocation/free?
+
 const ptz = @This();
 
 // standalone types
