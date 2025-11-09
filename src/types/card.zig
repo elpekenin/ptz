@@ -156,6 +156,41 @@ pub const Variants = struct {
     holo: bool,
     firstEdition: bool,
 
+    pub const empty: Variants = .{
+        .normal = false,
+        .reverse = false,
+        .holo = false,
+        .firstEdition = false,
+    };
+
+    pub fn isEmpty(self: Variants) bool {
+        const rhs: Variants = empty;
+        return std.mem.eql(u8, std.mem.asBytes(&self), std.mem.asBytes(&rhs));
+    }
+
+    const Error = error{InvalidFieldName};
+
+    pub fn get(self: Variants, field_name: []const u8) Error!bool {
+        inline for (@typeInfo(Variants).@"struct".fields) |field| {
+            if (std.mem.eql(u8, field.name, field_name)) {
+                return @field(self, field.name);
+            }
+        }
+
+        return error.InvalidFieldName;
+    }
+
+    pub fn set(self: *Variants, field_name: []const u8, value: bool) Error!void {
+        inline for (@typeInfo(Variants).@"struct".fields) |field| {
+            if (std.mem.eql(u8, field.name, field_name)) {
+                @field(self, field.name) = value;
+                return;
+            }
+        }
+
+        return error.InvalidFieldName;
+    }
+
     pub fn format(self: Variants, writer: *Writer) Writer.Error!void {
         try writer.print("{{ .normal = {}, .reverse = {}, .holo ={}, .firstEdition = {} }}", .{ self.normal, self.reverse, self.holo, self.firstEdition });
     }
