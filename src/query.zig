@@ -33,7 +33,12 @@ pub fn Query(comptime language: Language) type {
             id: []const u8,
 
             fn url(self: *const Get, writer: *Writer) !void {
-                try writer.print("/{s}", .{self.id});
+                try writer.writeByte('/');
+
+                // NOTE: id can contain to-be-escaped chars (eg: '-')
+                var percent_writer: percent_encoding.Writer = .init(writer);
+                const w = percent_writer.writer();
+                try w.print("{s}", .{self.id});
             }
         };
 
