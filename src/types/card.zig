@@ -17,7 +17,6 @@ const Pricing = @import("Pricing.zig");
 
 pub const Ability = struct {
     type: []const u8,
-    // FIXME: these 2 should be required
     name: ?[]const u8 = null,
     effect: ?[]const u8 = null,
 
@@ -37,14 +36,18 @@ pub const Ability = struct {
 };
 
 pub const Attack = struct {
-    cost: []const []const u8,
+    cost: ?[]const []const u8 = null,
     name: ?[]const u8 = null, // ??
     effect: ?[]const u8 = null,
     damage: ?Damage = null,
 
     pub fn format(self: Attack, writer: *Writer) Writer.Error!void {
-        try writer.print("{{ .cost = ", .{});
-        try fmt.printSlice([]const u8, writer, "{s}", self.cost);
+        try writer.print("{{ ", .{});
+
+        if (self.cost) |cost| {
+            try writer.print(".cost = ", .{});
+            try fmt.printSlice([]const u8, writer, "{s}", cost);
+        }
 
         if (self.name) |name| {
             try writer.print(", .name = {s}", .{name});
@@ -95,12 +98,12 @@ pub const Damage = union(enum) {
 // TODO: remove/simplify when values get unified upstream
 pub const DexId = union(enum) {
     str: []const u8,
-    int: usize,
+    ints: []const usize,
 
     pub fn format(self: DexId, writer: *Writer) Writer.Error!void {
         switch (self) {
             .str => |str| try writer.print("{s}", .{str}),
-            .int => |int| try writer.print("{d}", .{int}),
+            .ints => |ints| try writer.print("{any}", .{ints}),
         }
     }
 
@@ -124,10 +127,8 @@ pub const DexId = union(enum) {
             },
             .array_begin => {
                 const ids = try std.json.innerParse([]const usize, allocator, source, options);
-                if (ids.len != 1) return error.LengthMismatch;
-
                 return .{
-                    .int = ids[0],
+                    .ints = ids,
                 };
             },
             else => return error.UnexpectedToken,
@@ -505,7 +506,7 @@ pub fn Card(comptime language: Language) type {
 
             //
 
-            effect: []const u8,
+            effect: ?[]const u8 = null,
             energyType: []const u8,
 
             pub fn deinit(self: E) void {
@@ -517,7 +518,11 @@ pub fn Card(comptime language: Language) type {
 
                 try Common.formatFields(self, writer);
 
-                try writer.print(", .effect = {s}, .type = {s}", .{ self.effect, self.energyType });
+                if (self.effect) |effect| {
+                    try writer.print(", .effect = {s}", .{effect});
+                }
+
+                try writer.print(", .type = {s}", .{self.energyType});
 
                 try writer.print(" }}", .{});
             }
