@@ -446,9 +446,12 @@ pub fn Query(comptime language: Language) type {
                         // when querying multiple values, only set `__arena` to the last one
                         // this way, we only free after we are done with all of them
                         .many => {
-                            const len = parsed.value.len;
-                            if (len > 0) {
-                                meta.setArena(T, &parsed.value[len - 1], parsed.arena);
+                            switch (parsed.value.len) {
+                                0 => {
+                                    parsed.deinit();
+                                    return &.{};
+                                },
+                                else => |len| meta.setArena(T, &parsed.value[len - 1], parsed.arena),
                             }
                         },
                     }

@@ -199,12 +199,17 @@ pub const Variants = struct {
 
 pub const VariantDetailed = struct {
     type: []const u8,
+    subtype: ?[]const u8 = null,
     size: ?[]const u8 = null,
     stamp: ?[]const []const u8 = null,
     foil: ?[]const u8 = null,
 
     pub fn format(self: VariantDetailed, writer: *Writer) Writer.Error!void {
         try writer.print("{{ .type = {s}", .{self.type});
+
+        if (self.subtype) |subtype| {
+            try writer.print(", .subtype = {s}", .{subtype});
+        }
 
         if (self.size) |size| {
             try writer.print(", .size = {s}", .{size});

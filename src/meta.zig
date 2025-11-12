@@ -3,14 +3,7 @@
 //! Note: We store the pointer to the `ArenaAllocator` on a `*Empty` because `*ArenAllocator`, `*anyopaque` or `*void` would fail
 
 const std = @import("std");
-const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
-const ParseError = std.json.ParseFromValueError;
-const ParseOptions = std.json.ParseOptions;
-const Type = std.builtin.Type;
-const Value = std.json.Value;
-
-const query = @import("query.zig");
 
 pub const Empty = struct {};
 
