@@ -52,7 +52,7 @@ pub fn Set(comptime language: Language) type {
             return q.run();
         }
 
-        pub fn all(allocator: Allocator, params: query.ParamsFor(Brief)) query.Iterator(Brief) {
+        pub fn all(allocator: Allocator, params: Brief.Params) query.Iterator(Brief) {
             return Brief.iterator(allocator, params);
         }
 
@@ -90,6 +90,7 @@ pub fn Set(comptime language: Language) type {
 
         pub const Brief = struct {
             pub const url = S.url;
+            pub const Params = query.ParamsFor(Brief);
 
             id: []const u8,
             name: []const u8,
@@ -102,7 +103,7 @@ pub fn Set(comptime language: Language) type {
                 return q.run();
             }
 
-            pub fn iterator(allocator: Allocator, params: query.ParamsFor(Brief)) query.Iterator(Brief) {
+            pub fn iterator(allocator: Allocator, params: Params) query.Iterator(Brief) {
                 return .new(allocator, params);
             }
 

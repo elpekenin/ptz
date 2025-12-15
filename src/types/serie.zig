@@ -13,7 +13,7 @@ pub fn Serie(comptime language: Language) type {
     const query = Query(language);
 
     return struct {
-        const Self = @This();
+        const S = @This();
 
         pub const url = "series";
 
@@ -24,20 +24,20 @@ pub fn Serie(comptime language: Language) type {
         name: []const u8,
         logo: ?Image = null,
 
-        pub fn deinit(self: Self) void {
-            meta.deinit(Self, self);
+        pub fn deinit(self: S) void {
+            meta.deinit(S, self);
         }
 
-        pub fn get(allocator: Allocator, params: query.Get) !Self {
-            var q: query.Q(Self, .one) = .init(allocator, params);
+        pub fn get(allocator: Allocator, params: query.Get) !S {
+            var q: query.Q(S, .one) = .init(allocator, params);
             return q.run();
         }
 
-        pub fn all(allocator: Allocator, params: query.ParamsFor(Brief)) query.Iterator(Brief) {
+        pub fn all(allocator: Allocator, params: Brief.Params) query.Iterator(Brief) {
             return Brief.iterator(allocator, params);
         }
 
-        pub fn format(self: Self, writer: *Writer) Writer.Error!void {
+        pub fn format(self: S, writer: *Writer) Writer.Error!void {
             try writer.print("{{ ", .{});
 
             try writer.print(" .sets = ", .{});
@@ -54,7 +54,8 @@ pub fn Serie(comptime language: Language) type {
         }
 
         pub const Brief = struct {
-            pub const url = Self.url;
+            pub const url = S.url;
+            pub const Params = query.ParamsFor(Brief);
 
             id: []const u8,
             name: []const u8,
@@ -65,7 +66,7 @@ pub fn Serie(comptime language: Language) type {
                 return q.run();
             }
 
-            pub fn iterator(allocator: Allocator, params: query.ParamsFor(Brief)) query.Iterator(Brief) {
+            pub fn iterator(allocator: Allocator, params: Params) query.Iterator(Brief) {
                 return .new(allocator, params);
             }
 

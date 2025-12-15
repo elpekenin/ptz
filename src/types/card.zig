@@ -233,7 +233,7 @@ pub fn Card(comptime language: Language) type {
 
     // common args
     const Common = struct {
-        const Self = @This();
+        const C = @This();
 
         id: []const u8,
         localId: []const u8,
@@ -250,7 +250,7 @@ pub fn Card(comptime language: Language) type {
         legal: Legality,
         regulationMark: ?[]const u8,
 
-        fn from(value: anytype) Self {
+        fn from(value: anytype) C {
             return .{
                 .id = value.id,
                 .localId = value.localId,
@@ -271,7 +271,7 @@ pub fn Card(comptime language: Language) type {
 
         fn formatFields(value: anytype, writer: *Writer) Writer.Error!void {
             // for autocompletion in editor to work
-            const self: Self = from(value);
+            const self: C = from(value);
 
             try writer.print(".id = {s}, .local_id = {s}, .name = {s}", .{
                 self.id,
@@ -558,12 +558,13 @@ pub fn Card(comptime language: Language) type {
             return q.run();
         }
 
-        pub fn all(allocator: Allocator, params: query.ParamsFor(Brief)) query.Iterator(Brief) {
+        pub fn all(allocator: Allocator, params: Brief.Params) query.Iterator(Brief) {
             return Brief.iterator(allocator, params);
         }
 
         pub const Brief = struct {
             pub const url = C.url;
+            pub const Params = query.ParamsFor(Brief);
 
             __arena: ?*meta.Empty = null,
 
@@ -581,7 +582,7 @@ pub fn Card(comptime language: Language) type {
                 return q.run();
             }
 
-            pub fn iterator(allocator: Allocator, params: query.ParamsFor(Brief)) query.Iterator(Brief) {
+            pub fn iterator(allocator: Allocator, params: Params) query.Iterator(Brief) {
                 return .init(allocator, params);
             }
 
