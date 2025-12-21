@@ -369,7 +369,7 @@ pub fn Query(comptime language: Language) type {
 
                 /// used by Iterator
                 pub fn advancePage(self: *Self) void {
-                    const current_page = self.params.page orelse 0;
+                    const current_page = self.params.page orelse 1;
                     self.params.page = current_page + 1;
                 }
 
