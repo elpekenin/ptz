@@ -5,6 +5,9 @@ const ptz = @This();
 
 // standalone types
 pub const Language = @import("language.zig").Language;
+pub const Booster = @import("types/Booster.zig");
+pub const Image = @import("types/Image.zig");
+pub const Legality = @import("types/Legality.zig");
 pub const Pricing = @import("types/Pricing.zig");
 
 const serie = @import("types/serie.zig");
