@@ -319,10 +319,12 @@ pub fn Query(comptime language: Language) type {
 
                 pub const Params = ParamsFor(T);
 
+                exhausted: bool,
                 q: Q(T, .many),
 
                 pub fn init(allocator: Allocator, params: Params) Self {
                     return .{
+                        .exhausted = false,
                         .q = .init(allocator, .{
                             .where = params.where,
                             .page = params.page orelse 1,
@@ -333,11 +335,13 @@ pub fn Query(comptime language: Language) type {
                 }
 
                 pub fn next(self: *Self) !?[]const T {
-                    // TODO?: optimize avoiding extra call to `run` if last query was empty already
+                    if (self.exhausted) return null;
+
                     const items = try self.q.run();
                     self.q.advancePage();
 
                     if (items.len == 0) {
+                        self.exhausted = true;
                         return null;
                     }
 
