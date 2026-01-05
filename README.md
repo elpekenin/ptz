@@ -1,12 +1,9 @@
-WIP library to interact with the Pokemon TCG database at tcgdex.net
+Basic usage
+===
 
-Name stands for **P**okemon **T**cg in **Z**ig
+- List the dependency on project's `.zon` file: `zig fetch --save https://github.com/tcgdex/zig-sdk`
 
-Basic usage:
-
-1. List the dependency on project's `.zon` file: `zig fetch --save https://github.com/tcgdex/zig-sdk`
-
-1. Add the library to your code
+- Add the library to your code
 
 ```zig
 const dependeny = b.dependency("sdk", .{}); // both args are optional
@@ -14,7 +11,7 @@ const module = dependency.module("sdk");
 your_module.addImport("sdk", module);
 ```
 
-1. Use it, eg:
+- Use it, eg:
 
 ```zig
 const sdk = @import("sdk").Sdk(.en); // configure a language, en=english
