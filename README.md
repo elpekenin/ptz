@@ -1,7 +1,7 @@
 Basic usage
 ===
 
-- List the dependency on project's `.zon` file: `zig fetch --save https://github.com/tcgdex/zig-sdk`
+- Add the dependency to your project's `.zon` file: `zig fetch --save git+https://github.com/tcgdex/zig-sdk`
 
 - Add the library to your code
 
@@ -14,7 +14,8 @@ your_module.addImport("sdk", module);
 - Use it, eg:
 
 ```zig
-const sdk = @import("sdk").Sdk(.en); // configure a language, en=english
+// configure the sdk for a language, .en==english
+const sdk = @import("sdk").For(.en);
 
 // create an iterator to go through all cards with "machamp" in their name
 var iterator = sdk.Card.all(.{
