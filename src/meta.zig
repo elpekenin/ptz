@@ -52,7 +52,7 @@ pub fn deinit(comptime T: type, self: T) void {
             }
 
             // WARNING: must happen *after* iterating children, otherwise use-after-free
-            // if this is a ptz type, deinit based on the arena
+            // if this is a sdk type, deinit based on the arena
             if (@hasField(T, "__arena")) {
                 if (self.__arena) |ptr| {
                     const arena: *ArenaAllocator = @ptrCast(@alignCast(ptr));
@@ -64,7 +64,7 @@ pub fn deinit(comptime T: type, self: T) void {
             }
         },
         .@"union" => {
-            // if this is a ptz type, deinit the active tag
+            // if this is a sdk type, deinit the active tag
             if (@hasDecl(T, "__setArena")) {
                 self.deinit();
             }

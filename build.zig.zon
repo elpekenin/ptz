@@ -1,8 +1,8 @@
 .{
-    .name = .ptz,
+    .name = .sdk,
     .version = "0.0.1",
     .minimum_zig_version = "0.15.2",
-    .fingerprint = 0x503395929a05eb09,
+    .fingerprint = 0x7207196803f52b59,
     .dependencies = .{},
     .paths = .{
         "build.zig",

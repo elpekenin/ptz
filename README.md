@@ -3,18 +3,21 @@ WIP library to interact with the Pokemon TCG database at tcgdex.net
 Name stands for **P**okemon **T**cg in **Z**ig
 
 Basic usage:
-1. List the dependency on project's `.zon` file: `zig fetch --save https://github.com/elpekenin/ptz`
 
-2. Add the library to your code
+1. List the dependency on project's `.zon` file: `zig fetch --save https://github.com/tcgdex/zig-sdk`
+
+1. Add the library to your code
+
 ```zig
-const dependeny = b.dependency("ptz", .{}); // both args are optional
-const module = dependency.module("ptz");
-your_module.addImport("ptz", module);
+const dependeny = b.dependency("sdk", .{}); // both args are optional
+const module = dependency.module("sdk");
+your_module.addImport("sdk", module);
 ```
 
-3. Use it, eg:
+1. Use it, eg:
+
 ```zig
-const sdk = @import("ptz").sdk(.en); // configure a language, en=english
+const sdk = @import("sdk").Sdk(.en); // configure a language, en=english
 
 // create an iterator to go through all cards with "machamp" in their name
 var iterator = sdk.Card.all(.{
