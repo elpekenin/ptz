@@ -3,7 +3,12 @@
     .version = "0.0.1",
     .minimum_zig_version = "0.15.2",
     .fingerprint = 0x7207196803f52b59,
-    .dependencies = .{},
+    .dependencies = .{
+        .graphqlz = .{
+            .url = "git+https://github.com/elpekenin/graphqlz#603c7fd5e4040b818f900ae1fac5927e5779ba61",
+            .hash = "graphqlz-0.0.1-QhOWgIKVAACnXSBkNuMMqxvvNDflSyHy0nFOnERpZoP6",
+        },
+    },
     .paths = .{
         "build.zig",
         "build.zig.zon",

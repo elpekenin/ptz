@@ -1,6 +1,8 @@
 // TODO: on `jsonParse()`, figure out what to do with allocated vs non-allocated
 //       is it good as is, or shall we perform have to allocation/free?
 
+const graphqlz = @import("graphqlz");
+
 pub const Language = @import("language.zig").Language;
 
 const card = @import("types/card.zig");
@@ -30,3 +32,5 @@ pub fn For(comptime language: Language) type {
         pub const Set = set.Set(language);
     };
 }
+
+pub const graphql = graphqlz.Client("https://api.tcgdex.net/v2/graphql", @import("graphql/schema.zig")).execute;
